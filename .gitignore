@@ -1,0 +1,8 @@
+# Секреты: в репозитории хранится только vault.yml.example
+inventories/*/group_vars/all/vault.yml
+# Ключи CA и узлов, сгенерированные при pki_mode: selfsigned
+inventories/*/pki/
+# Коллекции, установленные локально через ansible-galaxy -p collections
+collections/
+*.retry
+.vault_pass*

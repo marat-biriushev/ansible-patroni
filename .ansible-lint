@@ -1,0 +1,9 @@
+---
+profile: production
+exclude_paths:
+  - collections/
+  - .github/
+  - inventories/prod/pki/
+mock_modules: []
+kinds:
+  - playbook: "playbooks/*.yml"

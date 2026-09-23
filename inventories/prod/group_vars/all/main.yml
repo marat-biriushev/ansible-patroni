@@ -1,0 +1,61 @@
+---
+# ---------------------------------------------------------------------------
+# Общие параметры кластера. Используются несколькими ролями.
+# ---------------------------------------------------------------------------
+pg_major_version: 18
+
+# Имя кластера Patroni и префикс ключей в etcd
+patroni_scope: pg18-ipoteka-cluster
+patroni_namespace: /db/
+
+# Узел, который инициализирует кластер при первом развёртывании (bootstrap)
+patroni_bootstrap_leader: "{{ groups['postgres'][0] }}"
+
+# Адрес узла для межузлового взаимодействия (listen/advertise/connect_address)
+cluster_node_ip: "{{ ansible_host }}"
+
+# Виртуальный IP (keepalived) — точка входа приложений
+cluster_vip: 10.10.10.100
+cluster_vip_prefix: 24
+
+# Порты
+postgresql_port: 5432
+patroni_restapi_port: 8008
+etcd_client_port: 2379
+etcd_peer_port: 2380
+pgbouncer_port: 6432
+haproxy_primary_port: 5000
+haproxy_replicas_port: 5001
+haproxy_stats_port: 7000
+
+# REST API Patroni по HTTPS (сертификат из PKI, см. ниже)
+patroni_restapi_tls: true
+
+# etcd размещён на узлах БД (группы etcd и postgres совпадают)
+etcd_colocated: false
+
+# Опциональные компоненты
+pgbouncer_enabled: false
+pgbackrest_enabled: false
+# Имя stanza pgBackRest (используется в archive_command/restore_command Patroni)
+pgbackrest_stanza: "{{ patroni_scope }}"
+
+# firewalld: открыть порты кластера (по умолчанию не трогаем)
+manage_firewalld: false
+firewalld_zone: public
+
+# SELinux: метки портов и boolean haproxy_connect_any (SELinux не отключается)
+manage_selinux: true
+
+# Скрывать секреты в выводе (no_log). false — только для отладки.
+secrets_no_log: true
+
+# ---------------------------------------------------------------------------
+# PKI для etcd (client+peer TLS), REST API Patroni и SSL PostgreSQL.
+#   selfsigned — CA и сертификаты узлов генерируются на контроллере
+#                в pki_local_dir (однократно, дальше переиспользуются);
+#   provided   — файлы выпущены корпоративным CA и положены в pki_local_dir:
+#                ca.crt, <host>-etcd.{crt,key}, <host>-patroni.{crt,key}
+# ---------------------------------------------------------------------------
+pki_mode: selfsigned
+pki_local_dir: "{{ inventory_dir }}/pki"
