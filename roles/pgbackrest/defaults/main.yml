@@ -1,0 +1,30 @@
+---
+pgbackrest_packages:
+  - pgbackrest
+pgbackrest_config_file: /etc/pgbackrest/pgbackrest.conf
+
+pgbackrest_pg_data_dir: "{{ postgresql_data_dir | default('/var/lib/pgsql/' ~ pg_major_version ~ '/data') }}"
+pgbackrest_pg_socket_dir: /run/postgresql
+
+# S3-совместимое хранилище (ключи — в vault)
+pgbackrest_s3_endpoint: s3.example.local
+pgbackrest_s3_bucket: pgbackrest
+pgbackrest_s3_region: us-east-1
+pgbackrest_s3_uri_style: path
+pgbackrest_s3_verify_tls: true
+pgbackrest_s3_ca_file: ""
+pgbackrest_repo_path: /{{ patroni_scope }}
+
+pgbackrest_cipher_type: aes-256-cbc
+pgbackrest_retention_full: 2
+pgbackrest_retention_diff: 7
+pgbackrest_process_max: 2
+pgbackrest_compress_type: zst
+pgbackrest_archive_async: true
+pgbackrest_spool_path: /var/spool/pgbackrest
+pgbackrest_extra_global: {}
+
+# Расписание (systemd OnCalendar). Бэкап выполняется только на лидере.
+pgbackrest_schedule_enabled: true
+pgbackrest_schedule_full: "Sun *-*-* 01:00:00"
+pgbackrest_schedule_diff: "Mon..Sat *-*-* 01:00:00"

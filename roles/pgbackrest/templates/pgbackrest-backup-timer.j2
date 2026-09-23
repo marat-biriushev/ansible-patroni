@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=pgBackRest {{ item.type }} backup schedule
+
+[Timer]
+OnCalendar={{ item.schedule }}
+Persistent=true
+RandomizedDelaySec=300
+Unit=pgbackrest-backup@{{ item.type }}.service
+
+[Install]
+WantedBy=timers.target

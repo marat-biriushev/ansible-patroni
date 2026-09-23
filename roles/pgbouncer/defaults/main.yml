@@ -1,0 +1,23 @@
+---
+pgbouncer_packages:
+  - pgbouncer
+# Драйвер для модулей community.postgresql (AppStream/PGDG)
+pgbouncer_python_packages:
+  - python3-psycopg2
+pgbouncer_config_dir: /etc/pgbouncer
+
+pgbouncer_listen_addr: "{{ cluster_node_ip }},127.0.0.1"
+pgbouncer_pool_mode: transaction
+pgbouncer_max_client_conn: 2000
+pgbouncer_default_pool_size: 50
+pgbouncer_min_pool_size: 0
+pgbouncer_reserve_pool_size: 5
+pgbouncer_server_idle_timeout: 600
+pgbouncer_ignore_startup_parameters: extra_float_digits,options
+pgbouncer_admin_users: postgres
+pgbouncer_stats_users: postgres
+
+# Пользователь для auth_query (пароль — в vault: pgbouncer_auth_password)
+pgbouncer_auth_user: pgbouncer
+pgbouncer_auth_dbname: postgres
+pgbouncer_auth_schema: pgbouncer

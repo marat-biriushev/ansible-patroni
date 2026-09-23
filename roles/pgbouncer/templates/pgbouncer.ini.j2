@@ -1,0 +1,24 @@
+; {{ ansible_managed }}
+[databases]
+* = host=127.0.0.1 port={{ postgresql_port }}
+
+[pgbouncer]
+listen_addr = {{ pgbouncer_listen_addr }}
+listen_port = {{ pgbouncer_port }}
+
+auth_type = scram-sha-256
+auth_file = {{ pgbouncer_config_dir }}/userlist.txt
+auth_user = {{ pgbouncer_auth_user }}
+auth_dbname = {{ pgbouncer_auth_dbname }}
+auth_query = SELECT usename, passwd FROM {{ pgbouncer_auth_schema }}.get_auth($1)
+
+pool_mode = {{ pgbouncer_pool_mode }}
+max_client_conn = {{ pgbouncer_max_client_conn }}
+default_pool_size = {{ pgbouncer_default_pool_size }}
+min_pool_size = {{ pgbouncer_min_pool_size }}
+reserve_pool_size = {{ pgbouncer_reserve_pool_size }}
+server_idle_timeout = {{ pgbouncer_server_idle_timeout }}
+ignore_startup_parameters = {{ pgbouncer_ignore_startup_parameters }}
+
+admin_users = {{ pgbouncer_admin_users }}
+stats_users = {{ pgbouncer_stats_users }}

@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: DBA team
+  description: pgBackRest with an S3-compatible repository for the Patroni cluster
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+dependencies: []

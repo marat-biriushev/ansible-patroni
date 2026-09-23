@@ -1,0 +1,10 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Запускает бэкап pgBackRest только на текущем лидере Patroni.
+set -euo pipefail
+type="${1:-diff}"
+if ! curl -sf -o /dev/null {% if patroni_restapi_tls | bool %}--cacert /etc/patroni/pki/ca.crt {% endif %}"{{ 'https' if patroni_restapi_tls | bool else 'http' }}://{{ cluster_node_ip }}:{{ patroni_restapi_port }}/primary"; then
+    echo "Узел не является лидером, бэкап пропущен"
+    exit 0
+fi
+exec pgbackrest --stanza={{ pgbackrest_stanza }} --type="${type}" backup

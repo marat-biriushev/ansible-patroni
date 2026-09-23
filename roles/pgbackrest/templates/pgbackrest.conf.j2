@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+[global]
+repo1-type=s3
+repo1-s3-endpoint={{ pgbackrest_s3_endpoint }}
+repo1-s3-bucket={{ pgbackrest_s3_bucket }}
+repo1-s3-region={{ pgbackrest_s3_region }}
+repo1-s3-uri-style={{ pgbackrest_s3_uri_style }}
+repo1-s3-key={{ pgbackrest_s3_key }}
+repo1-s3-key-secret={{ pgbackrest_s3_key_secret }}
+repo1-storage-verify-tls={{ 'y' if pgbackrest_s3_verify_tls | bool else 'n' }}
+{% if pgbackrest_s3_ca_file | length > 0 %}
+repo1-storage-ca-file={{ pgbackrest_s3_ca_file }}
+{% endif %}
+repo1-path={{ pgbackrest_repo_path }}
+repo1-cipher-type={{ pgbackrest_cipher_type }}
+repo1-cipher-pass={{ pgbackrest_cipher_pass }}
+repo1-retention-full={{ pgbackrest_retention_full }}
+repo1-retention-diff={{ pgbackrest_retention_diff }}
+
+process-max={{ pgbackrest_process_max }}
+compress-type={{ pgbackrest_compress_type }}
+start-fast=y
+delta=y
+archive-async={{ 'y' if pgbackrest_archive_async | bool else 'n' }}
+spool-path={{ pgbackrest_spool_path }}
+log-level-console=info
+log-level-file=detail
+log-path=/var/log/pgbackrest
+{% for key, value in pgbackrest_extra_global.items() %}
+{{ key }}={{ value }}
+{% endfor %}
+
+[{{ pgbackrest_stanza }}]
+pg1-path={{ pgbackrest_pg_data_dir }}
+pg1-port={{ postgresql_port }}
+pg1-socket-path={{ pgbackrest_pg_socket_dir }}

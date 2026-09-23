@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+[Unit]
+Description=pgBackRest %i backup of {{ pgbackrest_stanza }}
+After=patroni.service
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+ExecStart=/usr/local/bin/pgbackrest-backup %i

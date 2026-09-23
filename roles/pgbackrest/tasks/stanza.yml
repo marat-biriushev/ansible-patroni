@@ -1,0 +1,29 @@
+---
+- name: Read stanza status
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza={{ pgbackrest_stanza }} --output=json info
+  become: true
+  become_user: postgres
+  register: pgbackrest_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# status.code 0 — ok, 2 — нет бэкапов (stanza уже есть); иначе stanza не создана
+- name: Create stanza
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza={{ pgbackrest_stanza }} stanza-create
+  become: true
+  become_user: postgres
+  when: >-
+    pgbackrest_info.rc != 0
+    or (pgbackrest_info.stdout | from_json | first).status.code not in [0, 2]
+  changed_when: true
+
+- name: Check archiving and repository
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza={{ pgbackrest_stanza }} check
+  become: true
+  become_user: postgres
+  changed_when: false
+  when: not ansible_check_mode

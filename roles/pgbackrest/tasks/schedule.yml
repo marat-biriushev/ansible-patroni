@@ -1,0 +1,37 @@
+---
+- name: Deploy backup wrapper (runs only on the leader)
+  ansible.builtin.template:
+    src: pgbackrest-backup.sh.j2
+    dest: /usr/local/bin/pgbackrest-backup
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy backup service unit
+  ansible.builtin.template:
+    src: pgbackrest-backup@.service.j2
+    dest: /etc/systemd/system/pgbackrest-backup@.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: pgbackrest_service_unit
+
+- name: Deploy backup timers
+  ansible.builtin.template:
+    src: pgbackrest-backup-timer.j2
+    dest: /etc/systemd/system/pgbackrest-backup-{{ item.type }}.timer
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { type: full, schedule: "{{ pgbackrest_schedule_full }}" }
+    - { type: diff, schedule: "{{ pgbackrest_schedule_diff }}" }
+  register: pgbackrest_timer_units
+
+- name: Enable backup timers
+  ansible.builtin.systemd_service:
+    name: pgbackrest-backup-{{ item }}.timer
+    state: "{{ 'started' if pgbackrest_schedule_enabled | bool else 'stopped' }}"
+    enabled: "{{ pgbackrest_schedule_enabled | bool }}"
+    daemon_reload: "{{ pgbackrest_service_unit is changed or pgbackrest_timer_units is changed }}"
+  loop: [full, diff]

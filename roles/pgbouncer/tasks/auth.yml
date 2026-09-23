@@ -1,0 +1,35 @@
+---
+- name: Create PgBouncer auth user
+  community.postgresql.postgresql_user:
+    name: "{{ pgbouncer_auth_user }}"
+    password: "{{ pgbouncer_auth_password }}"
+    login_unix_socket: /run/postgresql
+    login_db: "{{ pgbouncer_auth_dbname }}"
+  become: true
+  become_user: postgres
+  no_log: "{{ secrets_no_log }}"
+
+- name: Create auth schema
+  community.postgresql.postgresql_schema:
+    name: "{{ pgbouncer_auth_schema }}"
+    owner: postgres
+    login_unix_socket: /run/postgresql
+    login_db: "{{ pgbouncer_auth_dbname }}"
+  become: true
+  become_user: postgres
+
+- name: Create SECURITY DEFINER lookup function
+  community.postgresql.postgresql_query:
+    login_unix_socket: /run/postgresql
+    login_db: "{{ pgbouncer_auth_dbname }}"
+    query: |
+      CREATE OR REPLACE FUNCTION {{ pgbouncer_auth_schema }}.get_auth(p_usename text)
+      RETURNS TABLE(usename name, passwd text)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS
+      $$ SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename = p_usename $$;
+      REVOKE ALL ON FUNCTION {{ pgbouncer_auth_schema }}.get_auth(text) FROM PUBLIC;
+      GRANT USAGE ON SCHEMA {{ pgbouncer_auth_schema }} TO {{ pgbouncer_auth_user }};
+      GRANT EXECUTE ON FUNCTION {{ pgbouncer_auth_schema }}.get_auth(text) TO {{ pgbouncer_auth_user }};
+  become: true
+  become_user: postgres
+  changed_when: false

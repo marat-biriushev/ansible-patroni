@@ -1,0 +1,63 @@
+---
+- name: Deploy PgBouncer
+  when: pgbouncer_enabled | bool
+  tags: [pgbouncer]
+  block:
+    - name: Check PgBouncer packages are available
+      ansible.builtin.include_role:
+        name: pg_repos
+        tasks_from: check_packages
+      vars:
+        pg_repos_check_packages: "{{ pgbouncer_packages }}"
+
+    - name: Install PgBouncer
+      ansible.builtin.dnf:
+        name: "{{ pgbouncer_packages + pgbouncer_python_packages }}"
+        state: present
+
+    - name: Deploy pgbouncer.ini
+      ansible.builtin.template:
+        src: pgbouncer.ini.j2
+        dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+        owner: pgbouncer
+        group: pgbouncer
+        mode: "0640"
+      notify: Restart pgbouncer
+
+    - name: Deploy userlist.txt for auth_user
+      ansible.builtin.template:
+        src: userlist.txt.j2
+        dest: "{{ pgbouncer_config_dir }}/userlist.txt"
+        owner: pgbouncer
+        group: pgbouncer
+        mode: "0600"
+      no_log: "{{ secrets_no_log }}"
+      notify: Restart pgbouncer
+
+    - name: Open PgBouncer port in firewalld
+      ansible.posix.firewalld:
+        port: "{{ pgbouncer_port }}/tcp"
+        zone: "{{ firewalld_zone }}"
+        permanent: true
+        immediate: true
+        state: enabled
+      when: manage_firewalld | bool
+
+    - name: Check whether this node is the Patroni leader
+      ansible.builtin.uri:
+        url: "{{ 'https' if patroni_restapi_tls | bool else 'http' }}://{{ cluster_node_ip }}:{{ patroni_restapi_port }}/primary"
+        ca_path: "{{ '/etc/patroni/pki/ca.crt' if patroni_restapi_tls | bool else omit }}"
+        status_code: [200, 503]
+      register: pgbouncer_leader_probe
+      failed_when: false
+      check_mode: false
+
+    - name: Create auth_query objects on the leader
+      ansible.builtin.import_tasks: auth.yml
+      when: pgbouncer_leader_probe.status | default(0) == 200
+
+    - name: Start and enable PgBouncer
+      ansible.builtin.systemd_service:
+        name: pgbouncer
+        state: started
+        enabled: true

@@ -1,0 +1,53 @@
+---
+- name: Deploy pgBackRest
+  when: pgbackrest_enabled | bool
+  tags: [pgbackrest]
+  block:
+    - name: Check pgBackRest packages are available
+      ansible.builtin.include_role:
+        name: pg_repos
+        tasks_from: check_packages
+      vars:
+        pg_repos_check_packages: "{{ pgbackrest_packages }}"
+
+    - name: Install pgBackRest
+      ansible.builtin.dnf:
+        name: "{{ pgbackrest_packages }}"
+        state: present
+
+    - name: Create pgBackRest directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0750"
+      loop:
+        - "{{ pgbackrest_config_file | dirname }}"
+        - /var/log/pgbackrest
+        - "{{ pgbackrest_spool_path }}"
+
+    - name: Deploy pgbackrest.conf
+      ansible.builtin.template:
+        src: pgbackrest.conf.j2
+        dest: "{{ pgbackrest_config_file }}"
+        owner: postgres
+        group: postgres
+        mode: "0600"
+      no_log: "{{ secrets_no_log }}"
+
+    - name: Install scheduled backups
+      ansible.builtin.import_tasks: schedule.yml
+
+    - name: Check whether this node is the Patroni leader
+      ansible.builtin.uri:
+        url: "{{ 'https' if patroni_restapi_tls | bool else 'http' }}://{{ cluster_node_ip }}:{{ patroni_restapi_port }}/primary"
+        ca_path: "{{ '/etc/patroni/pki/ca.crt' if patroni_restapi_tls | bool else omit }}"
+        status_code: [200, 503]
+      register: pgbackrest_leader_probe
+      failed_when: false
+      check_mode: false
+
+    - name: Initialize stanza on the leader
+      ansible.builtin.import_tasks: stanza.yml
+      when: pgbackrest_leader_probe.status | default(0) == 200
