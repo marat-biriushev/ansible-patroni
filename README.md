@@ -38,7 +38,6 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 
 ```
 ├── ansible.cfg  requirements.yml  .ansible-lint  .yamllint
-├── scripts/check_mirror.sh             # проверка зеркала с целевого хоста
 ├── inventories/prod/
 │   ├── hosts.yml                       # группы etcd, postgres, haproxy
 │   ├── group_vars/all/{main,repos,secrets}.yml, vault.yml.example
@@ -71,14 +70,13 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 | `postgres-common` | `postgre/yum/common/redhat/rhel-N-x86_64/` | patroni, patroni-etcd, pgbackrest, pgbouncer | выключен |
 | `postgres-extras` | `postgre/yum/common/pgdg-rhelN-extras/redhat/rhel-N-x86_64/` | etcd | выключен |
 
-Пути `common` и `extras` повторяют структуру PGDG, но в зеркале могут отличаться.
-Если путь другой, переопределите `baseurl` нужной записи. Новый репозиторий добавляется одной записью в список.
+Сейчас в зеркале есть только `postgres18`. Репозиториев `common` и `extras` нет, поэтому они
+выключены (`enabled: false`). Пути для них взяты по структуре PGDG. Когда команда зеркала их добавит,
+выставьте `enabled: true`; если путь окажется другим — поправьте `baseurl`.
+Новый репозиторий добавляется одной записью в список.
 
-**Проверка зеркала** (на любом RHEL 9 и RHEL 10 хосте внутри сети):
-
-```bash
-scripts/check_mirror.sh                         # HTTP-код repomd.xml и найденные пакеты
-```
+Пока `common`/`extras` нет, работают только теги `pg_repos` и `postgresql`. Роли etcd, patroni,
+pgbackrest, pgbouncer остановятся на проверке пакета с сообщением, какой репозиторий нужен.
 
 Защита от установки из недоступного источника:
 
