@@ -1,0 +1,28 @@
+---
+- name: Install Patroni
+  ansible.builtin.import_tasks: install.yml
+  tags: [patroni]
+
+- name: Configure kernel parameters
+  ansible.builtin.import_tasks: sysctl.yml
+  tags: [patroni]
+
+- name: Configure watchdog
+  ansible.builtin.import_tasks: watchdog.yml
+  tags: [patroni]
+
+- name: Deploy TLS
+  ansible.builtin.import_tasks: tls.yml
+  tags: [patroni]
+
+- name: Firewall and SELinux
+  ansible.builtin.import_tasks: security.yml
+  tags: [patroni]
+
+- name: Configure Patroni
+  ansible.builtin.import_tasks: config.yml
+  tags: [patroni]
+
+- name: Start Patroni
+  ansible.builtin.import_tasks: service.yml
+  tags: [patroni]

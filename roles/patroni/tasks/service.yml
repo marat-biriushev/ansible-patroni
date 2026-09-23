@@ -1,0 +1,29 @@
+---
+- name: Gather service state
+  ansible.builtin.service_facts:
+
+- name: Remember whether Patroni was already running
+  ansible.builtin.set_fact:
+    patroni_was_active: "{{ ansible_facts.services['patroni.service'].state | default('') == 'running' }}"
+
+- name: Apply pending changes (reload/restart only if Patroni was running)
+  ansible.builtin.meta: flush_handlers
+
+- name: Start and enable Patroni
+  ansible.builtin.systemd_service:
+    name: patroni
+    state: started
+    enabled: true
+  register: patroni_started
+
+# Лидер ждёт завершения bootstrap, реплика — pg_basebackup и запуска.
+- name: Wait until PostgreSQL is running under Patroni
+  ansible.builtin.uri:
+    url: "{{ patroni_restapi_url }}/health"
+    ca_path: "{{ patroni_pki_dir + '/ca.crt' if patroni_restapi_tls | bool else omit }}"
+    status_code: [200]
+  register: patroni_health
+  until: patroni_health.status == 200
+  retries: "{{ patroni_wait_retries }}"
+  delay: "{{ patroni_wait_delay }}"
+  when: not ansible_check_mode

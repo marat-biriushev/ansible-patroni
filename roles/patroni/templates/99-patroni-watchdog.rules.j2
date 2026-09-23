@@ -1,0 +1,3 @@
+# {{ ansible_managed }}
+# Patroni (пользователь postgres) должен открывать {{ patroni_watchdog_device }}
+KERNEL=="{{ patroni_watchdog_device | basename }}", OWNER="postgres", GROUP="postgres", MODE="0600"

@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Подключается из ~/.bash_profile пакета PGDG
+export PATH={{ postgresql_bin_dir }}:$PATH
+export PGDATA={{ postgresql_data_dir }}
+export PATRONICTL_CONFIG_FILE=/etc/patroni/patroni.yml

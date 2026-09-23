@@ -1,0 +1,97 @@
+# {{ ansible_managed }}
+{% set pg_hosts = groups['postgres'] | map('extract', hostvars, 'cluster_node_ip') | list %}
+{% set haproxy_hosts = groups['haproxy'] | default([]) | map('extract', hostvars, 'cluster_node_ip') | list %}
+{% set hba = namespace(lines=[
+  'local all all peer',
+  patroni_pg_hba_host_type ~ ' all all 127.0.0.1/32 ' ~ patroni_pg_hba_method,
+  patroni_pg_hba_host_type ~ ' replication ' ~ patroni_replication_user ~ ' 127.0.0.1/32 ' ~ patroni_pg_hba_method,
+]) %}
+{% for ip in pg_hosts %}
+{%   set hba.lines = hba.lines + [
+       patroni_pg_hba_host_type ~ ' replication ' ~ patroni_replication_user ~ ' ' ~ ip ~ '/32 ' ~ patroni_pg_hba_method,
+       patroni_pg_hba_host_type ~ ' all ' ~ patroni_rewind_user ~ ' ' ~ ip ~ '/32 ' ~ patroni_pg_hba_method,
+     ] %}
+{% endfor %}
+{% for ip in haproxy_hosts %}
+{%   set hba.lines = hba.lines + [patroni_pg_hba_host_type ~ ' all all ' ~ ip ~ '/32 ' ~ patroni_pg_hba_method] %}
+{% endfor %}
+{% for net in patroni_pg_hba_app_networks %}
+{%   set hba.lines = hba.lines + [patroni_pg_hba_host_type ~ ' all all ' ~ net ~ ' ' ~ patroni_pg_hba_method] %}
+{% endfor %}
+{% set initdb = [
+  {'encoding': patroni_initdb_encoding},
+  {'locale': patroni_initdb_locale},
+  'data-checksums',
+] + ([{'waldir': patroni_pg_wal_dir}] if patroni_pg_wal_dir | length > 0 else []) %}
+{% set pg = {
+  'listen': patroni_listen_ip ~ ',127.0.0.1:' ~ postgresql_port,
+  'connect_address': patroni_listen_ip ~ ':' ~ postgresql_port,
+  'data_dir': patroni_pg_data_dir,
+  'bin_dir': patroni_pg_bin_dir,
+  'pgpass': patroni_pgpass,
+  'use_unix_socket': true,
+  'use_unix_socket_repl': false,
+  'authentication': {
+    'superuser': {'username': patroni_superuser_name, 'password': patroni_superuser_password},
+    'replication': {'username': patroni_replication_user, 'password': patroni_replication_password},
+    'rewind': {'username': patroni_rewind_user, 'password': patroni_rewind_password},
+  },
+  'parameters': patroni_postgresql_parameters_default | combine(patroni_postgresql_parameters, recursive=true),
+  'pg_hba': (hba.lines + patroni_pg_hba_extra) | unique,
+  'basebackup': [{'checkpoint': 'fast'}] + ([{'waldir': patroni_pg_wal_dir}] if patroni_pg_wal_dir | length > 0 else []),
+  'remove_data_directory_on_rewind_failure': false,
+  'remove_data_directory_on_diverged_timelines': false,
+} %}
+{% if pgbackrest_enabled | bool %}
+{%   set pg = pg | combine({
+       'create_replica_methods': ['pgbackrest', 'basebackup'],
+       'pgbackrest': {
+         'command': 'pgbackrest --stanza=' ~ pgbackrest_stanza ~ ' --delta restore',
+         'keep_data': true,
+         'no_params': true,
+       },
+       'recovery_conf': {
+         'restore_command': 'pgbackrest --stanza=' ~ pgbackrest_stanza ~ ' archive-get %f "%p"',
+       },
+     }) %}
+{% endif %}
+{% set restapi = {
+  'listen': patroni_listen_ip ~ ':' ~ patroni_restapi_port,
+  'connect_address': patroni_listen_ip ~ ':' ~ patroni_restapi_port,
+  'authentication': {'username': patroni_restapi_user, 'password': patroni_restapi_password},
+} %}
+{% if patroni_restapi_tls | bool %}
+{%   set restapi = restapi | combine({
+       'certfile': patroni_pki_dir ~ '/server.crt',
+       'keyfile': patroni_pki_dir ~ '/server.key',
+       'cafile': patroni_pki_dir ~ '/ca.crt',
+       'verify_client': 'none',
+     }) %}
+{% endif %}
+{% set cfg = {
+  'scope': patroni_scope,
+  'namespace': patroni_namespace,
+  'name': patroni_node_name,
+  'log': {'level': 'INFO'},
+  'restapi': restapi,
+  'ctl': ({'cacert': patroni_pki_dir ~ '/ca.crt'} if patroni_restapi_tls | bool else {}),
+  'etcd3': {
+    'hosts': patroni_etcd_hosts,
+    'protocol': 'https',
+    'cacert': patroni_pki_dir ~ '/ca.crt',
+    'username': patroni_etcd_user,
+    'password': etcd_patroni_password,
+  },
+  'bootstrap': {
+    'dcs': patroni_dcs_config,
+    'initdb': initdb,
+  },
+  'postgresql': pg,
+  'watchdog': {
+    'mode': patroni_watchdog_mode,
+    'device': patroni_watchdog_device,
+    'safety_margin': patroni_watchdog_safety_margin,
+  },
+  'tags': patroni_tags,
+} %}
+{{ cfg | to_nice_yaml(indent=2, sort_keys=false) }}

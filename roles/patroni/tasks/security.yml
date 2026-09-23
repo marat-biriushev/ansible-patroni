@@ -1,0 +1,30 @@
+---
+- name: Open PostgreSQL and Patroni ports in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    zone: "{{ firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "{{ postgresql_port }}"
+    - "{{ patroni_restapi_port }}"
+  when: manage_firewalld | bool
+
+- name: Label Patroni ports for SELinux
+  when:
+    - manage_selinux | bool
+    - ansible_facts.selinux.status | default('disabled') == 'enabled'
+  block:
+    - name: Install SELinux management tools
+      ansible.builtin.dnf:
+        name: policycoreutils-python-utils
+        state: present
+
+    - name: Label Patroni REST API port
+      community.general.seport:
+        ports: "{{ item.port }}"
+        proto: tcp
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ patroni_selinux_ports }}"

@@ -1,0 +1,11 @@
+---
+- name: Set Patroni kernel parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/90-patroni.conf
+    reload: true
+    state: present
+  loop: "{{ patroni_sysctl | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"

@@ -1,0 +1,23 @@
+---
+- name: Check Patroni packages are available
+  ansible.builtin.include_role:
+    name: pg_repos
+    tasks_from: check_packages
+  vars:
+    pg_repos_check_packages: "{{ patroni_packages }}"
+
+- name: Install Patroni packages
+  ansible.builtin.dnf:
+    name: "{{ patroni_packages }}"
+    state: present
+
+- name: Create Patroni directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  loop:
+    - "{{ patroni_config_dir }}"
+    - "{{ patroni_pki_dir }}"

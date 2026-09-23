@@ -1,0 +1,27 @@
+---
+- name: Check whether this node is the leader
+  ansible.builtin.uri:
+    url: "{{ patroni_restapi_url }}/primary"
+    ca_path: "{{ patroni_pki_dir + '/ca.crt' if patroni_restapi_tls | bool else omit }}"
+    status_code: [200, 503]
+  register: patroni_leader_probe
+  failed_when: false
+
+- name: Switch leadership to a replica
+  ansible.builtin.command:
+    cmd: >-
+      {{ patroni_ctl_bin }} -c {{ patroni_config_file }}
+      switchover {{ patroni_scope }} --leader {{ patroni_node_name }} --force
+  when: patroni_leader_probe.status | default(0) == 200
+  changed_when: true
+
+- name: Wait until this node is a replica
+  ansible.builtin.uri:
+    url: "{{ patroni_restapi_url }}/replica"
+    ca_path: "{{ patroni_pki_dir + '/ca.crt' if patroni_restapi_tls | bool else omit }}"
+    status_code: [200]
+  register: patroni_replica_probe
+  until: patroni_replica_probe.status == 200
+  retries: "{{ patroni_wait_retries }}"
+  delay: "{{ patroni_wait_delay }}"
+  when: patroni_leader_probe.status | default(0) == 200

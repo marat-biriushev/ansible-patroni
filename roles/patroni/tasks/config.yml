@@ -1,0 +1,32 @@
+---
+- name: Deploy patroni.yml
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: "{{ patroni_config_file }}"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  no_log: "{{ secrets_no_log }}"
+  notify: Reload patroni
+
+- name: Deploy Patroni systemd unit
+  ansible.builtin.template:
+    src: patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Switchover before restart
+    - Restart patroni
+
+- name: Install patronictl environment for administrators
+  ansible.builtin.copy:
+    dest: /etc/profile.d/patronictl.sh
+    content: |
+      # {{ ansible_managed }}
+      export PATRONICTL_CONFIG_FILE={{ patroni_config_file }}
+    owner: root
+    group: root
+    mode: "0644"

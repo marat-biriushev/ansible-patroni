@@ -1,0 +1,24 @@
+---
+- name: Prepare certificates on the controller
+  ansible.builtin.include_role:
+    name: pki
+  vars:
+    pki_service: patroni
+    pki_hosts: "{{ ansible_play_hosts_all }}"
+    pki_extra_sans: ["IP:{{ cluster_vip }}"]
+
+- name: Deploy Patroni and PostgreSQL certificates
+  ansible.builtin.copy:
+    src: "{{ pki_local_dir }}/{{ item.src }}"
+    dest: "{{ patroni_pki_dir }}/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: ca.crt, dest: ca.crt, mode: "0644" }
+    - { src: "{{ inventory_hostname }}-patroni.crt", dest: server.crt, mode: "0644" }
+    - { src: "{{ inventory_hostname }}-patroni.key", dest: server.key, mode: "0600" }
+  loop_control:
+    label: "{{ item.dest }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  notify: Reload patroni

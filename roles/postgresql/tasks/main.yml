@@ -1,0 +1,43 @@
+---
+- name: Check PostgreSQL packages are available
+  ansible.builtin.include_role:
+    name: pg_repos
+    tasks_from: check_packages
+  vars:
+    pg_repos_check_packages: "{{ postgresql_packages }}"
+  tags: [postgresql]
+
+- name: Install PostgreSQL packages
+  ansible.builtin.dnf:
+    name: "{{ postgresql_packages }}"
+    state: present
+  tags: [postgresql]
+
+# Кластером управляет Patroni: штатный юнит пакета не должен стартовать
+- name: Mask the packaged postgresql unit
+  ansible.builtin.systemd_service:
+    name: postgresql-{{ pg_major_version }}.service
+    enabled: false
+    masked: true
+  tags: [postgresql]
+
+- name: Create data and WAL directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+  loop:
+    - "{{ postgresql_data_dir }}"
+    - "{{ postgresql_wal_dir }}"
+  tags: [postgresql]
+
+- name: Add PostgreSQL binaries to the postgres user PATH
+  ansible.builtin.template:
+    src: pgsql_profile.j2
+    dest: "{{ postgresql_home_dir }}/.pgsql_profile"
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  tags: [postgresql]

@@ -1,0 +1,147 @@
+---
+patroni_version: 4.1.5
+patroni_packages:
+  - patroni-{{ patroni_version }}
+  - patroni-etcd-{{ patroni_version }}
+patroni_bin: /usr/bin/patroni
+patroni_ctl_bin: /usr/bin/patronictl
+patroni_config_dir: /etc/patroni
+patroni_config_file: "{{ patroni_config_dir }}/patroni.yml"
+patroni_pki_dir: "{{ patroni_config_dir }}/pki"
+
+patroni_node_name: "{{ inventory_hostname }}"
+patroni_listen_ip: "{{ cluster_node_ip }}"
+
+# Каталоги (совпадают с ролью postgresql)
+patroni_pg_bin_dir: /usr/pgsql-{{ pg_major_version }}/bin
+patroni_pg_data_dir: "{{ postgresql_data_dir | default('/var/lib/pgsql/' ~ pg_major_version ~ '/data') }}"
+patroni_pg_wal_dir: "{{ postgresql_wal_dir | default('/var/lib/pgsql/' ~ pg_major_version ~ '/wal') }}"
+patroni_pg_unix_socket_dir: /run/postgresql
+patroni_pgpass: /var/lib/pgsql/.pgpass_patroni
+
+# ---- REST API ---------------------------------------------------------------
+patroni_restapi_user: patroni
+patroni_restapi_scheme: "{{ 'https' if patroni_restapi_tls | bool else 'http' }}"
+patroni_restapi_url: "{{ patroni_restapi_scheme }}://{{ patroni_listen_ip }}:{{ patroni_restapi_port }}"
+
+# ---- Роли PostgreSQL, создаваемые Patroni при bootstrap ---------------------
+patroni_superuser_name: postgres
+patroni_replication_user: replicator
+patroni_rewind_user: rewind_user
+
+# ---- etcd3 -----------------------------------------------------------------
+patroni_etcd_user: patroni
+patroni_etcd_hosts: "{{ groups['etcd'] | map('extract', hostvars, 'cluster_node_ip') | map('regex_replace', '$', ':' ~ etcd_client_port) | list }}"
+
+# ---- io_method (PostgreSQL 18) ---------------------------------------------
+# io_uring используется, только если postgres собран с liburing и ядро не
+# запрещает io_uring (kernel.io_uring_disabled = 0). Иначе — worker.
+patroni_io_method: io_uring
+patroni_io_method_fallback: worker
+
+# ---- bootstrap.dcs ----------------------------------------------------------
+patroni_shared_buffers: "{{ (ansible_facts.memtotal_mb * 0.25) | int }}MB"
+patroni_max_connections: 200
+patroni_archive_command: "{{ ('pgbackrest --stanza=' ~ pgbackrest_stanza ~ ' archive-push %p') if pgbackrest_enabled | bool else '/bin/true' }}"
+
+patroni_dcs_parameters:
+  wal_level: replica
+  hot_standby: "on"
+  io_method: "{{ patroni_io_method_effective | default(patroni_io_method_fallback) }}"
+  shared_buffers: "{{ patroni_shared_buffers }}"
+  max_connections: "{{ patroni_max_connections }}"
+  max_worker_processes: 8
+  max_wal_senders: 10
+  max_replication_slots: 10
+  max_prepared_transactions: 0
+  max_locks_per_transaction: 64
+  wal_log_hints: "on"
+  wal_keep_size: 1GB
+  track_commit_timestamp: "off"
+  archive_mode: "on"
+  archive_command: "{{ patroni_archive_command }}"
+  archive_timeout: 1800s
+
+patroni_dcs_defaults:
+  ttl: 30
+  loop_wait: 10
+  retry_timeout: 10
+  maximum_lag_on_failover: 1048576
+  synchronous_mode: true
+  synchronous_mode_strict: false
+  postgresql:
+    use_pg_rewind: true
+    use_slots: true
+    parameters: "{{ patroni_dcs_parameters }}"
+
+# Переопределения из инвентори (group_vars/postgres.yml)
+patroni_dcs_overrides: {}
+patroni_dcs_config: "{{ patroni_dcs_defaults | combine(patroni_dcs_overrides, recursive=true) }}"
+
+# После --tags dcs_config перезапустить узлы с pending restart
+patroni_dcs_restart_pending: false
+
+# ---- initdb -----------------------------------------------------------------
+patroni_initdb_encoding: UTF8
+patroni_initdb_locale: C.UTF-8
+
+# ---- postgresql.parameters (локальные для узла) -----------------------------
+# SSL PostgreSQL на том же сертификате узла, что и REST API
+patroni_postgresql_ssl: true
+patroni_postgresql_parameters_default:
+  unix_socket_directories: "{{ patroni_pg_unix_socket_dir }}"
+  password_encryption: scram-sha-256
+  ssl: "{{ 'on' if patroni_postgresql_ssl | bool else 'off' }}"
+  ssl_cert_file: "{{ patroni_pki_dir }}/server.crt"
+  ssl_key_file: "{{ patroni_pki_dir }}/server.key"
+  ssl_ca_file: "{{ patroni_pki_dir }}/ca.crt"
+  shared_preload_libraries: pg_stat_statements
+  effective_cache_size: "{{ (ansible_facts.memtotal_mb * 0.75) | int }}MB"
+  maintenance_work_mem: "{{ [(ansible_facts.memtotal_mb * 0.05) | int, 2048] | min }}MB"
+  logging_collector: "on"
+  log_directory: log
+  log_filename: postgresql-%a.log
+  log_truncate_on_rotation: "on"
+  log_rotation_age: 1d
+  log_rotation_size: 0
+  log_line_prefix: "%m [%p] %q%u@%d "
+  log_checkpoints: "on"
+  log_lock_waits: "on"
+  log_temp_files: 0
+  log_autovacuum_min_duration: 10s
+patroni_postgresql_parameters: {}
+
+# ---- pg_hba -----------------------------------------------------------------
+patroni_pg_hba_host_type: host
+patroni_pg_hba_method: scram-sha-256
+patroni_pg_hba_app_networks: []
+patroni_pg_hba_extra: []
+
+# ---- Watchdog ---------------------------------------------------------------
+patroni_watchdog_mode: automatic   # off | automatic | required
+patroni_watchdog_module: softdog
+patroni_watchdog_device: /dev/watchdog
+patroni_watchdog_safety_margin: 5
+
+# ---- Теги узла (задаются в host_vars) ---------------------------------------
+patroni_tags: {}
+
+# ---- sysctl -----------------------------------------------------------------
+# При overcommit_memory=2 лимит = swap + RAM * overcommit_ratio/100.
+# Проверьте, что shared_buffers + память процессов в него укладываются.
+patroni_sysctl:
+  vm.overcommit_memory: 2
+  vm.overcommit_ratio: 80
+
+# ---- systemd ----------------------------------------------------------------
+patroni_malloc_arena_max: 1
+patroni_limit_nofile: 65536
+
+# ---- Rolling restart --------------------------------------------------------
+# Перед перезапуском Patroni на лидере переключить лидерство на реплику
+patroni_switchover_before_restart: true
+patroni_wait_retries: 60
+patroni_wait_delay: 10
+
+patroni_selinux_ports:
+  - { port: "{{ patroni_restapi_port }}", setype: http_port_t }

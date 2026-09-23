@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Patroni PostgreSQL HA ({{ patroni_scope }})
+Documentation=https://patroni.readthedocs.io/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=postgres
+Group=postgres
+# Ограничение арен glibc malloc — снижает потребление памяти (наследуется postgres)
+Environment=MALLOC_ARENA_MAX={{ patroni_malloc_arena_max }}
+Environment=PATRONI_CONFIG_FILE={{ patroni_config_file }}
+ExecStart={{ patroni_bin }} {{ patroni_config_file }}
+ExecReload=/bin/kill -s HUP $MAINPID
+# Останавливаем только Patroni; postgres он завершает сам
+KillMode=process
+TimeoutSec=30
+# Patroni не перезапускается автоматически: решение принимает администратор
+Restart=no
+LimitNOFILE={{ patroni_limit_nofile }}
+
+[Install]
+WantedBy=multi-user.target

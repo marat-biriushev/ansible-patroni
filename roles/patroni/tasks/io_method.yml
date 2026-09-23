@@ -1,0 +1,44 @@
+---
+# io_method задаётся в DCS и одинаков для всех узлов, поэтому io_uring
+# включается, только если его поддерживают ВСЕ узлы postgres.
+# Выполняется в подготовительном play без serial (playbooks/patroni.yml).
+- name: Check postgres is linked with liburing
+  ansible.builtin.shell:
+    cmd: set -o pipefail && ldd {{ patroni_pg_bin_dir }}/postgres | grep -q liburing
+  register: patroni_liburing
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: patroni_io_method == 'io_uring'
+
+- name: Read kernel.io_uring_disabled
+  ansible.builtin.slurp:
+    src: /proc/sys/kernel/io_uring_disabled
+  register: patroni_io_uring_sysctl
+  failed_when: false
+  when: patroni_io_method == 'io_uring'
+
+- name: Record io_uring support of this node
+  ansible.builtin.set_fact:
+    patroni_io_uring_supported: >-
+      {{ patroni_liburing.rc | default(1) == 0
+         and (patroni_io_uring_sysctl.content | default('MAo=') | b64decode | trim) == '0' }}
+
+- name: Choose effective io_method for the cluster
+  ansible.builtin.set_fact:
+    patroni_io_method_effective: >-
+      {{ patroni_io_method_fallback
+         if patroni_io_method == 'io_uring'
+            and (ansible_play_hosts | map('extract', hostvars, 'patroni_io_uring_supported') | map('bool') | reject | list | length > 0)
+         else patroni_io_method }}
+
+- name: Warn about io_method fallback
+  ansible.builtin.debug:
+    msg: >-
+      io_uring недоступен на {{ inventory_hostname }}
+      (liburing в postgres: {{ patroni_liburing.rc | default(1) == 0 }},
+      kernel.io_uring_disabled={{ patroni_io_uring_sysctl.content | default('') | b64decode | trim }}),
+      для кластера используется io_method={{ patroni_io_method_fallback }}.
+  when:
+    - patroni_io_method == 'io_uring'
+    - not patroni_io_uring_supported | bool

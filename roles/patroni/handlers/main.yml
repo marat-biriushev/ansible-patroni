@@ -1,0 +1,48 @@
+---
+- name: Reload udev rules
+  ansible.builtin.command:
+    cmd: udevadm control --reload-rules
+  changed_when: true
+  listen: Apply watchdog udev rule
+
+- name: Trigger udev for the watchdog device
+  ansible.builtin.command:
+    cmd: udevadm trigger --action=add --sysname-match=watchdog
+  changed_when: true
+  listen: Apply watchdog udev rule
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# Перед перезапуском Patroni на лидере — плановый switchover на синхронную реплику,
+# чтобы не вызывать аварийный failover. Play выполняется с serial: 1.
+- name: Switchover before restart
+  ansible.builtin.include_tasks: switchover.yml
+  when:
+    - patroni_was_active | default(false)
+    - patroni_switchover_before_restart | bool
+    - groups['postgres'] | length > 1
+
+- name: Restart patroni
+  ansible.builtin.systemd_service:
+    name: patroni
+    state: restarted
+  when: patroni_was_active | default(false)
+  notify: Wait for Patroni
+
+- name: Reload patroni
+  ansible.builtin.systemd_service:
+    name: patroni
+    state: reloaded
+  when: patroni_was_active | default(false)
+
+- name: Wait for Patroni
+  ansible.builtin.uri:
+    url: "{{ patroni_restapi_url }}/health"
+    ca_path: "{{ patroni_pki_dir + '/ca.crt' if patroni_restapi_tls | bool else omit }}"
+    status_code: [200]
+  register: patroni_health_after_restart
+  until: patroni_health_after_restart.status == 200
+  retries: "{{ patroni_wait_retries }}"
+  delay: "{{ patroni_wait_delay }}"

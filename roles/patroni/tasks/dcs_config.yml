@@ -1,0 +1,38 @@
+---
+# Изменение динамической конфигурации (DCS) после bootstrap.
+# Запуск: ansible-playbook playbooks/patroni.yml --tags dcs_config
+- name: Apply DCS configuration
+  run_once: true
+  block:
+    - name: Read current DCS configuration
+      ansible.builtin.command:
+        cmd: "{{ patroni_ctl_bin }} -c {{ patroni_config_file }} show-config {{ patroni_scope }}"
+      register: patroni_dcs_current
+      changed_when: false
+      check_mode: false
+
+    - name: Compute desired DCS configuration
+      ansible.builtin.set_fact:
+        patroni_dcs_current_config: "{{ patroni_dcs_current.stdout | from_yaml }}"
+        patroni_dcs_desired_config: "{{ patroni_dcs_current.stdout | from_yaml | combine(patroni_dcs_config, recursive=true) }}"
+
+    - name: Show DCS changes
+      ansible.builtin.debug:
+        msg:
+          before: "{{ patroni_dcs_current_config }}"
+          after: "{{ patroni_dcs_desired_config }}"
+      when: patroni_dcs_desired_config != patroni_dcs_current_config
+
+    - name: Apply changes with patronictl edit-config
+      ansible.builtin.command:
+        cmd: "{{ patroni_ctl_bin }} -c {{ patroni_config_file }} edit-config {{ patroni_scope }} --apply - --force"
+        stdin: "{{ patroni_dcs_config | to_nice_yaml(indent=2) }}"
+      when: patroni_dcs_desired_config != patroni_dcs_current_config
+      changed_when: true
+
+    - name: Restart members with pending restart
+      ansible.builtin.command:
+        cmd: "{{ patroni_ctl_bin }} -c {{ patroni_config_file }} restart {{ patroni_scope }} --pending --force"
+      when: patroni_dcs_restart_pending | bool
+      register: patroni_pending_restart
+      changed_when: "'Success' in patroni_pending_restart.stdout"
