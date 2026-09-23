@@ -1,0 +1,25 @@
+---
+- name: Check etcd packages are available
+  ansible.builtin.include_role:
+    name: pg_repos
+    tasks_from: check_packages
+  vars:
+    pg_repos_check_packages: "{{ etcd_packages }}"
+
+- name: Install etcd packages
+  ansible.builtin.dnf:
+    name: "{{ etcd_packages }}"
+    state: present
+
+- name: Ensure etcd group
+  ansible.builtin.group:
+    name: "{{ etcd_group }}"
+    system: true
+
+- name: Ensure etcd service account
+  ansible.builtin.user:
+    name: "{{ etcd_user }}"
+    group: "{{ etcd_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false

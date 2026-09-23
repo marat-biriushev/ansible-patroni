@@ -1,0 +1,116 @@
+---
+# Идемпотентная настройка RBAC. Выполняется на одном узле etcd.
+- name: Configure etcd users and roles
+  run_once: true
+  when: not ansible_check_mode
+  no_log: "{{ secrets_no_log }}"
+  block:
+    - name: Check authentication status as root
+      ansible.builtin.command:
+        cmd: etcdctl auth status
+      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password}) }}"
+      register: etcd_auth_status
+      changed_when: false
+      failed_when: false
+
+    - name: Choose etcdctl credentials
+      ansible.builtin.set_fact:
+        etcd_auth_enabled: "{{ etcd_auth_status.rc == 0 and 'Status: true' in etcd_auth_status.stdout }}"
+        etcd_ctl_env: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password})
+                          if (etcd_auth_status.rc == 0 and 'Status: true' in etcd_auth_status.stdout) else etcd_ctl_env_base }}"
+
+    - name: List etcd users
+      ansible.builtin.command:
+        cmd: etcdctl user list
+      environment: "{{ etcd_ctl_env }}"
+      register: etcd_users
+      changed_when: false
+
+    - name: List etcd roles
+      ansible.builtin.command:
+        cmd: etcdctl role list
+      environment: "{{ etcd_ctl_env }}"
+      register: etcd_roles
+      changed_when: false
+
+    - name: Create root user
+      ansible.builtin.command:
+        cmd: etcdctl user add {{ etcd_root_user }} --interactive=false
+        stdin: "{{ etcd_root_password }}"
+      environment: "{{ etcd_ctl_env }}"
+      when: etcd_root_user not in etcd_users.stdout_lines
+      changed_when: true
+
+    - name: Grant root role to root user
+      ansible.builtin.command:
+        cmd: etcdctl user grant-role {{ etcd_root_user }} root
+      environment: "{{ etcd_ctl_env }}"
+      when: etcd_root_user not in etcd_users.stdout_lines
+      changed_when: true
+
+    - name: Create Patroni role
+      ansible.builtin.command:
+        cmd: etcdctl role add {{ etcd_patroni_role }}
+      environment: "{{ etcd_ctl_env }}"
+      when: etcd_patroni_role not in etcd_roles.stdout_lines
+      changed_when: true
+
+    - name: Read Patroni role permissions
+      ansible.builtin.command:
+        cmd: etcdctl role get {{ etcd_patroni_role }}
+      environment: "{{ etcd_ctl_env }}"
+      register: etcd_patroni_role_perms
+      changed_when: false
+
+    - name: Grant readwrite on the Patroni namespace
+      ansible.builtin.command:
+        cmd: etcdctl role grant-permission {{ etcd_patroni_role }} --prefix=true readwrite {{ etcd_patroni_prefix }}
+      environment: "{{ etcd_ctl_env }}"
+      when: (etcd_patroni_role_perms.stdout | split('(prefix ' ~ etcd_patroni_prefix ~ ')') | length) < 3
+      changed_when: true
+
+    - name: Create Patroni user
+      ansible.builtin.command:
+        cmd: etcdctl user add {{ etcd_patroni_user }} --interactive=false
+        stdin: "{{ etcd_patroni_password }}"
+      environment: "{{ etcd_ctl_env }}"
+      when: etcd_patroni_user not in etcd_users.stdout_lines
+      changed_when: true
+
+    - name: Read Patroni user roles
+      ansible.builtin.command:
+        cmd: etcdctl user get {{ etcd_patroni_user }}
+      environment: "{{ etcd_ctl_env }}"
+      register: etcd_patroni_user_info
+      changed_when: false
+
+    - name: Grant Patroni role to Patroni user
+      ansible.builtin.command:
+        cmd: etcdctl user grant-role {{ etcd_patroni_user }} {{ etcd_patroni_role }}
+      environment: "{{ etcd_ctl_env }}"
+      when: etcd_patroni_role not in (etcd_patroni_user_info.stdout | regex_search('Roles:.*') | default('', true))
+      changed_when: true
+
+    - name: Enable authentication
+      ansible.builtin.command:
+        cmd: etcdctl auth enable
+      environment: "{{ etcd_ctl_env }}"
+      when: not etcd_auth_enabled
+      changed_when: true
+
+    # Проверка пароля Patroni и синхронизация при ротации в vault
+    - name: Verify Patroni credentials
+      ansible.builtin.command:
+        cmd: etcdctl get {{ etcd_patroni_prefix }} --prefix --keys-only --limit 1
+      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_patroni_user, 'ETCDCTL_PASSWORD': etcd_patroni_password}) }}"
+      register: etcd_patroni_login
+      changed_when: false
+      failed_when: false
+
+    - name: Update Patroni user password
+      ansible.builtin.command:
+        cmd: etcdctl user passwd {{ etcd_patroni_user }} --interactive=false
+        stdin: "{{ etcd_patroni_password }}"
+      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password}) }}"
+      when: etcd_patroni_login.rc != 0
+      changed_when: true

@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+[Unit]
+Description=etcd key-value store (DCS for {{ patroni_scope }})
+Documentation=https://etcd.io/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User={{ etcd_user }}
+Group={{ etcd_group }}
+WorkingDirectory={{ etcd_data_dir }}
+ExecStart={{ etcd_binary }} --config-file {{ etcd_config_file }}
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=180
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

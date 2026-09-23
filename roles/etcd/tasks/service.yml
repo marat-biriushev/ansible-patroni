@@ -1,0 +1,28 @@
+---
+- name: Gather service state
+  ansible.builtin.service_facts:
+
+- name: Remember whether etcd was already running
+  ansible.builtin.set_fact:
+    etcd_was_active: "{{ ansible_facts.services['etcd.service'].state | default('') == 'running' }}"
+
+- name: Apply pending unit changes
+  ansible.builtin.meta: flush_handlers
+
+# Все узлы стартуют одновременно: etcd ждёт кворума до отправки sd_notify.
+- name: Start and enable etcd
+  ansible.builtin.systemd_service:
+    name: etcd
+    state: started
+    enabled: true
+
+- name: Wait for local etcd endpoint
+  ansible.builtin.command:
+    cmd: etcdctl endpoint health
+  environment: "{{ etcd_ctl_env_base }}"
+  register: etcd_health
+  until: etcd_health.rc == 0
+  retries: "{{ etcd_wait_retries }}"
+  delay: "{{ etcd_wait_delay }}"
+  changed_when: false
+  when: not ansible_check_mode

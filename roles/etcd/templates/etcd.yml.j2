@@ -1,0 +1,37 @@
+# {{ ansible_managed }}
+{% set ns = namespace(members=[]) %}
+{% for h in groups['etcd'] %}
+{%   set ns.members = ns.members + [h ~ '=https://' ~ hostvars[h].cluster_node_ip ~ ':' ~ etcd_peer_port] %}
+{% endfor %}
+{% set cfg = {
+  'name': inventory_hostname,
+  'data-dir': etcd_data_dir,
+  'listen-peer-urls': 'https://' ~ etcd_listen_ip ~ ':' ~ etcd_peer_port,
+  'listen-client-urls': 'https://' ~ etcd_listen_ip ~ ':' ~ etcd_client_port ~ ',https://127.0.0.1:' ~ etcd_client_port,
+  'initial-advertise-peer-urls': 'https://' ~ etcd_listen_ip ~ ':' ~ etcd_peer_port,
+  'advertise-client-urls': 'https://' ~ etcd_listen_ip ~ ':' ~ etcd_client_port,
+  'initial-cluster': ns.members | join(','),
+  'initial-cluster-token': etcd_initial_cluster_token,
+  'initial-cluster-state': etcd_initial_cluster_state,
+  'heartbeat-interval': etcd_heartbeat_interval,
+  'election-timeout': etcd_election_timeout,
+  'auto-compaction-mode': etcd_auto_compaction_mode,
+  'auto-compaction-retention': etcd_auto_compaction_retention,
+  'quota-backend-bytes': etcd_quota_backend_bytes,
+  'logger': 'zap',
+  'log-level': etcd_log_level,
+  'log-outputs': ['stderr'],
+  'client-transport-security': {
+    'cert-file': etcd_pki_dir ~ '/server.crt',
+    'key-file': etcd_pki_dir ~ '/server.key',
+    'trusted-ca-file': etcd_pki_dir ~ '/ca.crt',
+    'client-cert-auth': etcd_client_cert_auth | bool,
+  },
+  'peer-transport-security': {
+    'cert-file': etcd_pki_dir ~ '/server.crt',
+    'key-file': etcd_pki_dir ~ '/server.key',
+    'trusted-ca-file': etcd_pki_dir ~ '/ca.crt',
+    'client-cert-auth': true,
+  },
+} %}
+{{ cfg | combine(etcd_extra_config, recursive=true) | to_nice_yaml(indent=2, sort_keys=false) }}

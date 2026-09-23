@@ -1,0 +1,30 @@
+---
+- name: Open etcd ports in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    zone: "{{ firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "{{ etcd_client_port }}"
+    - "{{ etcd_peer_port }}"
+  when: manage_firewalld | bool
+
+- name: Label etcd ports for SELinux
+  when:
+    - manage_selinux | bool
+    - ansible_facts.selinux.status | default('disabled') == 'enabled'
+  block:
+    - name: Install SELinux management tools
+      ansible.builtin.dnf:
+        name: policycoreutils-python-utils
+        state: present
+
+    - name: Label etcd ports
+      community.general.seport:
+        ports: "{{ item.port }}"
+        proto: tcp
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ etcd_selinux_ports }}"

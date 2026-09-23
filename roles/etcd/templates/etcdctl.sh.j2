@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Для команд с аутентификацией: etcdctl --user root <команда> (пароль спросит)
+export ETCDCTL_API=3
+export ETCDCTL_ENDPOINTS="{{ groups['etcd'] | map('extract', hostvars, 'cluster_node_ip') | map('regex_replace', '^(.*)$', 'https://\\1:' ~ etcd_client_port) | join(',') }}"
+export ETCDCTL_CACERT="{{ etcd_pki_dir }}/ca.crt"

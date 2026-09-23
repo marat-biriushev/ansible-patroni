@@ -1,0 +1,40 @@
+---
+etcd_packages:
+  - etcd
+etcd_binary: /usr/bin/etcd
+etcd_user: etcd
+etcd_group: etcd
+
+etcd_config_dir: /etc/etcd
+etcd_config_file: "{{ etcd_config_dir }}/etcd.yml"
+etcd_pki_dir: "{{ etcd_config_dir }}/pki"
+etcd_data_dir: /var/lib/etcd
+
+etcd_listen_ip: "{{ cluster_node_ip }}"
+etcd_initial_cluster_token: "{{ patroni_scope }}-etcd"
+etcd_initial_cluster_state: new
+
+etcd_heartbeat_interval: 100
+etcd_election_timeout: 1000
+etcd_auto_compaction_mode: periodic
+etcd_auto_compaction_retention: "1"
+etcd_quota_backend_bytes: 2147483648
+etcd_log_level: info
+# Требовать клиентский сертификат от клиентов (Patroni ходит по логину/паролю)
+etcd_client_cert_auth: false
+# Доп. параметры etcd.yml (ключи как в --config-file)
+etcd_extra_config: {}
+
+# Аутентификация (обязательна: etcd >= 3.5.28 / 3.6.9 требует её для
+# чтения топологии кластера и lease keepalive)
+etcd_root_user: root
+etcd_patroni_user: patroni
+etcd_patroni_role: patroni
+etcd_patroni_prefix: "{{ patroni_namespace }}"
+
+etcd_wait_retries: 30
+etcd_wait_delay: 5
+
+etcd_selinux_ports:
+  - { port: "{{ etcd_client_port }}", setype: http_port_t }
+  - { port: "{{ etcd_peer_port }}", setype: http_port_t }

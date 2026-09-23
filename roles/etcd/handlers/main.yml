@@ -1,0 +1,24 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# Перезапуск только уже работавшего etcd и по одному узлу — чтобы не терять кворум.
+# Первый старт выполняется параллельно в tasks/service.yml.
+- name: Restart etcd
+  ansible.builtin.systemd_service:
+    name: etcd
+    state: restarted
+  when: etcd_was_active | default(false)
+  throttle: 1
+  notify: Wait for etcd health
+
+- name: Wait for etcd health
+  ansible.builtin.command:
+    cmd: etcdctl endpoint health
+  environment: "{{ etcd_ctl_env_base }}"
+  register: etcd_health_after_restart
+  until: etcd_health_after_restart.rc == 0
+  retries: "{{ etcd_wait_retries }}"
+  delay: "{{ etcd_wait_delay }}"
+  changed_when: false

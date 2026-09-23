@@ -1,0 +1,32 @@
+---
+- name: Common facts for etcdctl
+  ansible.builtin.set_fact:
+    etcd_ctl_env_base:
+      ETCDCTL_API: "3"
+      ETCDCTL_ENDPOINTS: "https://{{ etcd_listen_ip }}:{{ etcd_client_port }}"
+      ETCDCTL_CACERT: "{{ etcd_pki_dir }}/ca.crt"
+  tags: [etcd]
+
+- name: Install etcd
+  ansible.builtin.import_tasks: install.yml
+  tags: [etcd]
+
+- name: Deploy TLS
+  ansible.builtin.import_tasks: tls.yml
+  tags: [etcd]
+
+- name: Configure etcd
+  ansible.builtin.import_tasks: config.yml
+  tags: [etcd]
+
+- name: Firewall and SELinux
+  ansible.builtin.import_tasks: security.yml
+  tags: [etcd]
+
+- name: Start etcd
+  ansible.builtin.import_tasks: service.yml
+  tags: [etcd]
+
+- name: Configure etcd authentication
+  ansible.builtin.import_tasks: auth.yml
+  tags: [etcd, etcd_auth]

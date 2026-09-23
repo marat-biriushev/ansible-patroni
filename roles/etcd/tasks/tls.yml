@@ -1,0 +1,31 @@
+---
+- name: Prepare certificates on the controller
+  ansible.builtin.include_role:
+    name: pki
+  vars:
+    pki_service: etcd
+    pki_hosts: "{{ ansible_play_hosts_all }}"
+
+- name: Create etcd PKI directory
+  ansible.builtin.file:
+    path: "{{ etcd_pki_dir }}"
+    state: directory
+    owner: root
+    group: "{{ etcd_group }}"
+    mode: "0750"
+
+- name: Deploy etcd certificates
+  ansible.builtin.copy:
+    src: "{{ pki_local_dir }}/{{ item.src }}"
+    dest: "{{ etcd_pki_dir }}/{{ item.dest }}"
+    owner: root
+    group: "{{ etcd_group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: ca.crt, dest: ca.crt, mode: "0644" }
+    - { src: "{{ inventory_hostname }}-etcd.crt", dest: server.crt, mode: "0644" }
+    - { src: "{{ inventory_hostname }}-etcd.key", dest: server.key, mode: "0640" }
+  loop_control:
+    label: "{{ item.dest }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  notify: Restart etcd

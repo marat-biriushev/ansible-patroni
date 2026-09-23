@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: DBA team
+  description: etcd v3 cluster with TLS and authentication (Patroni DCS)
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+dependencies: []
