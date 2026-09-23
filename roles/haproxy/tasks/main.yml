@@ -1,0 +1,51 @@
+---
+- name: Install HAProxy (AppStream)
+  ansible.builtin.dnf:
+    name: haproxy
+    state: present
+  tags: [haproxy]
+
+- name: Create HAProxy PKI directory
+  ansible.builtin.file:
+    path: "{{ haproxy_pki_dir }}"
+    state: directory
+    owner: root
+    group: haproxy
+    mode: "0750"
+  when: haproxy_check_tls | bool
+  tags: [haproxy]
+
+- name: Deploy CA for Patroni REST API checks
+  ansible.builtin.copy:
+    src: "{{ pki_local_dir }}/ca.crt"
+    dest: "{{ haproxy_pki_dir }}/ca.crt"
+    owner: root
+    group: haproxy
+    mode: "0644"
+  when: haproxy_check_tls | bool
+  ignore_errors: "{{ ansible_check_mode }}"
+  notify: Reload haproxy
+  tags: [haproxy]
+
+- name: Deploy haproxy.cfg
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: haproxy
+    mode: "0640"
+    validate: haproxy -c -f %s
+  no_log: "{{ secrets_no_log }}"
+  notify: Reload haproxy
+  tags: [haproxy]
+
+- name: Firewall and SELinux
+  ansible.builtin.import_tasks: security.yml
+  tags: [haproxy]
+
+- name: Start and enable HAProxy
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: started
+    enabled: true
+  tags: [haproxy]

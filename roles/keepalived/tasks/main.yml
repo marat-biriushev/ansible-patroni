@@ -1,0 +1,46 @@
+---
+# ip_nonlocal_bind нужен до старта haproxy: на BACKUP-узле VIP отсутствует,
+# а haproxy слушает именно VIP.
+- name: Allow binding to non-local addresses
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: "1"
+    sysctl_file: /etc/sysctl.d/90-keepalived.conf
+    reload: true
+    state: present
+  tags: [keepalived]
+
+- name: Install keepalived (AppStream)
+  ansible.builtin.dnf:
+    name: keepalived
+    state: present
+  tags: [keepalived]
+
+- name: Deploy keepalived.conf
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: "{{ secrets_no_log }}"
+  notify: Restart keepalived
+  tags: [keepalived]
+
+- name: Allow VRRP from the peer in firewalld
+  ansible.posix.firewalld:
+    rich_rule: 'rule family="ipv4" source address="{{ item }}" protocol value="vrrp" accept'
+    zone: "{{ firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ keepalived_unicast_peers }}"
+  when: manage_firewalld | bool
+  tags: [keepalived]
+
+- name: Start and enable keepalived
+  ansible.builtin.systemd_service:
+    name: keepalived
+    state: started
+    enabled: true
+  tags: [keepalived]

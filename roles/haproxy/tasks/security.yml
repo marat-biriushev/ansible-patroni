@@ -1,0 +1,38 @@
+---
+- name: Open HAProxy ports in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    zone: "{{ firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "{{ haproxy_primary_port }}"
+    - "{{ haproxy_replicas_port }}"
+    - "{{ haproxy_stats_port }}"
+  when: manage_firewalld | bool
+
+- name: Configure SELinux for HAProxy
+  when:
+    - manage_selinux | bool
+    - ansible_facts.selinux.status | default('disabled') == 'enabled'
+  block:
+    - name: Install SELinux management tools
+      ansible.builtin.dnf:
+        name: policycoreutils-python-utils
+        state: present
+
+    - name: Label HAProxy listen ports
+      community.general.seport:
+        ports: "{{ item.port }}"
+        proto: tcp
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ haproxy_selinux_ports }}"
+
+    # Подключения к бэкендам на 5432/6432/8008
+    - name: Allow HAProxy to connect to any port
+      ansible.posix.seboolean:
+        name: haproxy_connect_any
+        state: true
+        persistent: true

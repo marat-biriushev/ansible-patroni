@@ -1,0 +1,29 @@
+---
+haproxy_bind_address: "{{ cluster_vip }}"
+haproxy_maxconn: 4000
+haproxy_backend_maxconn: 1000
+haproxy_timeout_connect: 4s
+haproxy_timeout_client: 30m
+haproxy_timeout_server: 30m
+haproxy_timeout_check: 5s
+
+# Проверки Patroni REST API
+haproxy_check_inter: 3s
+haproxy_check_fall: 3
+haproxy_check_rise: 2
+haproxy_primary_check_uri: /primary
+# Можно ограничить лаг: /replica?lag=16MB
+haproxy_replicas_check_uri: /replica
+haproxy_replicas_balance: roundrobin
+
+# Порт PostgreSQL на бэкендах: 6432 при включённом PgBouncer
+haproxy_backend_port: "{{ pgbouncer_port if pgbouncer_enabled | bool else postgresql_port }}"
+haproxy_check_tls: "{{ patroni_restapi_tls }}"
+haproxy_pki_dir: /etc/haproxy/pki
+
+haproxy_stats_user: admin
+
+haproxy_selinux_ports:
+  - { port: "{{ haproxy_primary_port }}", setype: http_port_t }
+  - { port: "{{ haproxy_replicas_port }}", setype: http_port_t }
+  - { port: "{{ haproxy_stats_port }}", setype: http_port_t }

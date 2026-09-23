@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: DBA team
+  description: keepalived VIP for HAProxy nodes (unicast VRRP)
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+dependencies: []

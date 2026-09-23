@@ -1,0 +1,21 @@
+---
+keepalived_vip: "{{ cluster_vip }}"
+keepalived_vip_prefix: "{{ cluster_vip_prefix }}"
+keepalived_interface: "{{ ansible_facts.default_ipv4.interface }}"
+keepalived_unicast_src_ip: "{{ cluster_node_ip }}"
+keepalived_unicast_peers: "{{ groups['haproxy'] | difference([inventory_hostname]) | map('extract', hostvars, 'cluster_node_ip') | list }}"
+
+# Роль узла и приоритет задаются в host_vars
+keepalived_state: BACKUP
+keepalived_priority: 100
+keepalived_virtual_router_id: 51
+keepalived_advert_int: 1
+# auth_pass — из vault (keepalived_auth_pass)
+
+# Проверка живости haproxy (psmisc не ставим: pidof есть в procps-ng)
+keepalived_check_script: /usr/bin/pidof haproxy
+keepalived_check_interval: 2
+keepalived_check_timeout: 2
+keepalived_check_weight: -60
+keepalived_check_fall: 2
+keepalived_check_rise: 2

@@ -1,0 +1,54 @@
+# {{ ansible_managed }}
+global
+    log         /dev/log local0
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     {{ haproxy_maxconn }}
+    user        haproxy
+    group       haproxy
+    daemon
+    stats socket /var/lib/haproxy/stats mode 660 level admin
+
+defaults
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    option                  dontlognull
+    retries                 2
+    timeout queue           5s
+    timeout connect         {{ haproxy_timeout_connect }}
+    timeout client          {{ haproxy_timeout_client }}
+    timeout server          {{ haproxy_timeout_server }}
+    timeout check           {{ haproxy_timeout_check }}
+    maxconn                 {{ haproxy_maxconn }}
+
+listen stats
+    mode http
+    bind {{ haproxy_bind_address }}:{{ haproxy_stats_port }}
+    stats enable
+    stats uri /
+    stats refresh 10s
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
+
+{% macro servers() %}
+    default-server inter {{ haproxy_check_inter }} fall {{ haproxy_check_fall }} rise {{ haproxy_check_rise }} on-marked-down shutdown-sessions
+{% for host in groups['postgres'] %}
+    server {{ host }} {{ hostvars[host].cluster_node_ip }}:{{ haproxy_backend_port }} maxconn {{ haproxy_backend_maxconn }} check port {{ patroni_restapi_port }}{% if haproxy_check_tls | bool %} check-ssl verify required ca-file {{ haproxy_pki_dir }}/ca.crt{% endif %}
+
+{% endfor %}
+{% endmacro %}
+# Запись: только лидер Patroni
+listen primary
+    bind {{ haproxy_bind_address }}:{{ haproxy_primary_port }}
+    option httpchk
+    http-check send meth GET uri {{ haproxy_primary_check_uri }}
+    http-check expect status 200
+{{ servers() }}
+# Чтение: реплики в состоянии running
+listen replicas
+    bind {{ haproxy_bind_address }}:{{ haproxy_replicas_port }}
+    balance {{ haproxy_replicas_balance }}
+    option httpchk
+    http-check send meth GET uri {{ haproxy_replicas_check_uri }}
+    http-check expect status 200
+{{ servers() }}
