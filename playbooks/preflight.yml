@@ -1,0 +1,95 @@
+---
+- name: Preflight checks
+  hosts: etcd:postgres:haproxy
+  gather_facts: true
+  become: false
+  tags: [always, preflight]
+  vars:
+    required_secrets:
+      - patroni_superuser_password
+      - patroni_replication_password
+      - patroni_rewind_password
+      - patroni_restapi_password
+      - etcd_root_password
+      - etcd_patroni_password
+      - keepalived_auth_pass
+      - haproxy_stats_password
+    optional_secrets: >-
+      {{ (['pgbouncer_auth_password'] if pgbouncer_enabled | bool else [])
+         + (['pgbackrest_s3_key', 'pgbackrest_s3_key_secret', 'pgbackrest_cipher_pass'] if pgbackrest_enabled | bool else []) }}
+    haproxy_hostvars: "{{ groups['haproxy'] | default([]) | map('extract', hostvars) | list }}"
+    keepalived_masters: "{{ haproxy_hostvars | selectattr('keepalived_state', 'defined') | selectattr('keepalived_state', 'equalto', 'MASTER')
+                            | map(attribute='inventory_hostname') | list }}"
+  tasks:
+    - name: Assert supported operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'RedHat'
+          - ansible_facts.distribution_major_version in ['9', '10']
+        fail_msg: >-
+          Поддерживаются только RHEL 9 и RHEL 10, на {{ inventory_hostname }}:
+          {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+        quiet: true
+
+    - name: Assert inventory topology
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - groups['etcd'] | default([]) | length is odd
+          - groups['postgres'] | default([]) | length >= 2
+          - groups['haproxy'] | default([]) | length == 2
+          - keepalived_masters | length == 1
+          - patroni_bootstrap_leader in groups['postgres']
+          - etcd_colocated | bool or (groups['etcd'] | intersect(groups['postgres']) | length == 0)
+          - not (etcd_colocated | bool) or (groups['etcd'] | difference(groups['postgres']) | length == 0)
+        fail_msg: >-
+          Нарушена топология: etcd={{ groups['etcd'] | default([]) | length }} (нужно нечётное),
+          postgres={{ groups['postgres'] | default([]) | length }} (>= 2),
+          haproxy={{ groups['haproxy'] | default([]) | length }} (ровно 2),
+          keepalived MASTER={{ keepalived_masters }} (ровно один),
+          patroni_bootstrap_leader={{ patroni_bootstrap_leader | default('?') }},
+          etcd_colocated={{ etcd_colocated }} (при false группы etcd и postgres не пересекаются,
+          при true все узлы etcd входят в postgres).
+        quiet: true
+
+    - name: Assert keepalived failover is possible
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - master.keepalived_priority | int + master.keepalived_check_weight | int
+            < (groups['haproxy'] | difference(keepalived_masters) | map('extract', hostvars, 'keepalived_priority') | map('int') | max)
+          - master.keepalived_virtual_router_id | int >= 1 and master.keepalived_virtual_router_id | int <= 255
+        fail_msg: >-
+          Приоритет MASTER + keepalived_check_weight должен быть ниже приоритета BACKUP,
+          иначе VIP не уйдёт при падении haproxy; virtual_router_id — 1..255.
+        quiet: true
+      vars:
+        master: "{{ hostvars[keepalived_masters[0]] }}"
+      when: keepalived_masters | length == 1
+
+    - name: Assert secrets are set
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.vars', item, default='') | string | length > 0
+          - lookup('ansible.builtin.vars', item, default='') != 'CHANGE_ME'
+        fail_msg: "Секрет {{ item }} не задан в group_vars/all/vault.yml"
+        quiet: true
+      # Выводится только имя переменной, не значение
+      loop: "{{ required_secrets + optional_secrets }}"
+
+    - name: Assert keepalived auth_pass length
+      run_once: true
+      ansible.builtin.assert:
+        that: keepalived_auth_pass | length <= 8
+        fail_msg: "keepalived_auth_pass длиннее 8 символов — VRRP PASS использует только первые 8"
+        quiet: true
+
+    - name: Assert cluster VIP is set
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - cluster_vip is match('^(\d{1,3}\.){3}\d{1,3}$')
+          - cluster_vip not in (groups['haproxy'] | map('extract', hostvars, 'cluster_node_ip') | list)
+        fail_msg: "cluster_vip ({{ cluster_vip }}) должен быть свободным IPv4-адресом"
+        quiet: true

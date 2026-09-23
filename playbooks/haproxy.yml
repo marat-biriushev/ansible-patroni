@@ -1,0 +1,11 @@
+---
+# keepalived первым: ip_nonlocal_bind должен быть включён до старта haproxy на VIP
+- name: Deploy keepalived and HAProxy (one node at a time)
+  hosts: haproxy
+  gather_facts: true
+  serial: 1
+  roles:
+    - role: keepalived
+      tags: [keepalived]
+    - role: haproxy
+      tags: [haproxy]

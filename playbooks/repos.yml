@@ -1,0 +1,7 @@
+---
+- name: Configure PostgreSQL repositories
+  hosts: etcd:postgres
+  gather_facts: true
+  roles:
+    - role: pg_repos
+      tags: [pg_repos]

@@ -1,0 +1,7 @@
+---
+- name: Deploy pgBackRest
+  hosts: postgres
+  gather_facts: true
+  roles:
+    - role: pgbackrest
+      tags: [pgbackrest]

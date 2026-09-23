@@ -1,0 +1,68 @@
+---
+- name: Install PostgreSQL
+  hosts: postgres
+  gather_facts: true
+  roles:
+    - role: postgresql
+      tags: [postgresql]
+
+# Порядок раскатки Patroni:
+#  - первичный bootstrap: сначала patroni_bootstrap_leader, затем остальные;
+#  - работающий кластер: сначала реплики, текущий лидер — последним.
+- name: Prepare Patroni rollout
+  hosts: postgres
+  gather_facts: true
+  tags: [always]
+  tasks:
+    - name: Detect io_method support on all nodes
+      ansible.builtin.include_role:
+        name: patroni
+        tasks_from: io_method
+
+    - name: Probe current Patroni leader
+      ansible.builtin.uri:
+        url: "{{ 'https' if patroni_restapi_tls | bool else 'http' }}://{{ cluster_node_ip }}:{{ patroni_restapi_port }}/primary"
+        ca_path: "{{ '/etc/patroni/pki/ca.crt' if patroni_restapi_tls | bool else omit }}"
+        status_code: [200, 503]
+        timeout: 5
+      register: rollout_leader_probe
+      failed_when: false
+      check_mode: false
+
+    - name: Group hosts by rollout order
+      ansible.builtin.group_by:
+        key: "{{ 'patroni_rollout_last' if is_last | bool else 'patroni_rollout_first' }}"
+      vars:
+        running_leaders: >-
+          {{ ansible_play_hosts | map('extract', hostvars, 'rollout_leader_probe') | map(attribute='status', default=0)
+             | map('int') | select('equalto', 200) | list }}
+        is_last: >-
+          {{ (running_leaders | length > 0 and rollout_leader_probe.status | default(0) | int == 200)
+             or (running_leaders | length == 0 and inventory_hostname != patroni_bootstrap_leader) }}
+      changed_when: false
+
+- name: Deploy Patroni (one node at a time)
+  hosts: patroni_rollout_first:patroni_rollout_last
+  gather_facts: true
+  serial: 1
+  roles:
+    - role: patroni
+      tags: [patroni]
+    - role: pgbouncer
+      tags: [pgbouncer]
+
+# Изменение DCS после bootstrap: ansible-playbook playbooks/patroni.yml --tags dcs_config
+- name: Apply Patroni DCS configuration
+  hosts: postgres
+  gather_facts: true
+  tags: [never, dcs_config]
+  tasks:
+    - name: Detect io_method support on all nodes
+      ansible.builtin.include_role:
+        name: patroni
+        tasks_from: io_method
+
+    - name: Apply patroni_dcs_config via patronictl edit-config
+      ansible.builtin.include_role:
+        name: patroni
+        tasks_from: dcs_config

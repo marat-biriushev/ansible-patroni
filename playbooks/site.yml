@@ -1,0 +1,21 @@
+---
+# Полное развёртывание. Порядок:
+# preflight → pg_repos → etcd → postgresql → patroni (serial: 1)
+# → haproxy + keepalived (serial: 1) → pgbackrest
+- name: Preflight
+  ansible.builtin.import_playbook: preflight.yml
+
+- name: Repositories
+  ansible.builtin.import_playbook: repos.yml
+
+- name: Etcd
+  ansible.builtin.import_playbook: etcd.yml
+
+- name: PostgreSQL and Patroni
+  ansible.builtin.import_playbook: patroni.yml
+
+- name: HAProxy and keepalived
+  ansible.builtin.import_playbook: haproxy.yml
+
+- name: PgBackRest
+  ansible.builtin.import_playbook: pgbackrest.yml
