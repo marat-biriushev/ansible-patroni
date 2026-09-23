@@ -1,0 +1,24 @@
+---
+- name: Check provided certificates
+  when: pki_mode == 'provided'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  block:
+    - name: Stat provided PKI files
+      ansible.builtin.stat:
+        path: "{{ pki_local_dir }}/{{ item }}"
+      register: pki_provided
+      loop: "{{ ['ca.crt'] + pki_hosts | product(['-' ~ pki_service ~ '.crt', '-' ~ pki_service ~ '.key']) | map('join') | list }}"
+
+    - name: Fail on missing PKI files
+      ansible.builtin.fail:
+        msg: "Нет файла {{ pki_local_dir }}/{{ item.item }} (pki_mode: provided)"
+      when: not item.stat.exists
+      loop: "{{ pki_provided.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+- name: Generate self-signed PKI
+  ansible.builtin.import_tasks: selfsigned.yml
+  when: pki_mode == 'selfsigned'

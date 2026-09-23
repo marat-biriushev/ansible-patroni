@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: DBA team
+  description: Self-signed CA and host certificates on the controller
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+dependencies: []

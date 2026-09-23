@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: DBA team
+  description: PostgreSQL repositories from the internal mirror
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["9", "10"]
+dependencies: []

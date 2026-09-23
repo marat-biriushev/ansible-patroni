@@ -1,0 +1,12 @@
+---
+# Вызывается из ролей etcd и patroni:
+#   include_role: name=pki  vars: pki_service=etcd, pki_hosts=[...]
+pki_service: ""
+pki_hosts: []
+pki_extra_sans: []
+
+pki_ca_common_name: "{{ patroni_scope }} CA"
+pki_ca_valid_days: 3650
+pki_cert_valid_days: 825
+pki_key_type: RSA
+pki_key_size: 3072

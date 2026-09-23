@@ -1,0 +1,107 @@
+---
+- name: Create local PKI directory
+  ansible.builtin.file:
+    path: "{{ pki_local_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+# В --check на первом запуске ключей ещё нет: шаги CSR/подписи пропускаются.
+- name: Stat existing private keys
+  ansible.builtin.stat:
+    path: "{{ pki_local_dir }}/{{ item }}.key"
+  register: pki_key_stat
+  loop: "{{ ['ca'] + pki_hosts | map('regex_replace', '$', '-' ~ pki_service) | list }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Generate CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ pki_local_dir }}/ca.key"
+    type: "{{ pki_key_type }}"
+    size: "{{ pki_key_size }}"
+    mode: "0600"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Create CA CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ pki_local_dir }}/ca.key"
+    common_name: "{{ pki_ca_common_name }}"
+    basic_constraints: ["CA:TRUE"]
+    basic_constraints_critical: true
+    key_usage: [keyCertSign, cRLSign]
+    key_usage_critical: true
+    use_common_name_for_san: false
+  register: pki_ca_csr
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode or pki_key_stat.results[0].stat.exists
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Issue CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ pki_local_dir }}/ca.crt"
+    csr_content: "{{ pki_ca_csr.csr }}"
+    privatekey_path: "{{ pki_local_dir }}/ca.key"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ pki_ca_valid_days }}d"
+    mode: "0644"
+  when: pki_ca_csr.csr is defined
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Generate host private keys
+  community.crypto.openssl_privatekey:
+    path: "{{ pki_local_dir }}/{{ item }}-{{ pki_service }}.key"
+    type: "{{ pki_key_type }}"
+    size: "{{ pki_key_size }}"
+    mode: "0600"
+  loop: "{{ pki_hosts }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Create host CSRs
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ pki_local_dir }}/{{ item }}-{{ pki_service }}.key"
+    common_name: "{{ item }}"
+    subject_alt_name: "{{ (['DNS:' ~ item, 'DNS:localhost', 'IP:127.0.0.1', 'IP:' ~ hostvars[item].cluster_node_ip]
+                          + hostvars[item].pki_host_dns_names | default([]) | map('regex_replace', '^', 'DNS:') | list
+                          + pki_extra_sans) | unique }}"
+    key_usage: [digitalSignature, keyEncipherment]
+    extended_key_usage: [serverAuth, clientAuth]
+  register: pki_host_csr
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode or pki_key_stat.results[idx + 1].stat.exists
+  loop: "{{ pki_hosts }}"
+  loop_control:
+    index_var: idx
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Issue host certificates
+  community.crypto.x509_certificate:
+    path: "{{ pki_local_dir }}/{{ item.item }}-{{ pki_service }}.crt"
+    csr_content: "{{ item.csr }}"
+    provider: ownca
+    ownca_path: "{{ pki_local_dir }}/ca.crt"
+    ownca_privatekey_path: "{{ pki_local_dir }}/ca.key"
+    ownca_not_after: "+{{ pki_cert_valid_days }}d"
+    mode: "0644"
+  when: item.csr is defined and pki_ca_csr.csr is defined
+  loop: "{{ pki_host_csr.results }}"
+  loop_control:
+    label: "{{ item.item }}-{{ pki_service }}"
+  delegate_to: localhost
+  run_once: true
+  become: false

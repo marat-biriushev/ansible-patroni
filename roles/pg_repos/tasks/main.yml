@@ -1,0 +1,24 @@
+---
+- name: Configure PostgreSQL repositories
+  ansible.builtin.yum_repository:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(item.name) }}"
+    baseurl: "{{ item.baseurl }}"
+    file: "{{ pg_repos_file }}"
+    enabled: "{{ item.enabled | default(true) | bool }}"
+    gpgcheck: "{{ item.gpgcheck | default(pg_repo_gpgcheck) | bool }}"
+    gpgkey: "{{ item.gpgkey | default(omit) }}"
+    state: present
+  loop: "{{ pg_repos_list }}"
+  loop_control:
+    label: "{{ item.name }} (enabled={{ item.enabled | default(true) }})"
+  tags: [pg_repos]
+
+- name: Check repositories are reachable in the mirror
+  ansible.builtin.import_tasks: preflight.yml
+  tags: [pg_repos, preflight]
+
+- name: Disable the AppStream postgresql module (RHEL 9)
+  ansible.builtin.import_tasks: modules.yml
+  when: ansible_facts.distribution_major_version == '9'
+  tags: [pg_repos]

@@ -1,0 +1,25 @@
+---
+# Список репозиториев задаётся в group_vars/all/repos.yml (pg_repos_list).
+# Значения ниже — запасные, если роль используется вне этого инвентори.
+pg_repos_list:
+  - name: postgres18
+    description: PostgreSQL 18 Local Repo
+    baseurl: "{{ pg_mirror_base }}/postgre/yum/{{ pg_major_version }}/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
+    enabled: true
+
+pg_repos_file: postgres-local
+
+# Какой репозиторий нужен для пакета — используется в сообщении об ошибке
+# при проверке доступности пакетов (tasks/check_packages.yml).
+pg_repos_package_hints:
+  postgresql18-server: postgres18
+  postgresql18-contrib: postgres18
+  postgresql18: postgres18
+  patroni: postgres-common
+  patroni-etcd: postgres-common
+  pgbackrest: postgres-common
+  pgbouncer: postgres-common
+  etcd: postgres-extras
+
+# Пакеты для проверки (передаётся из других ролей через include_role)
+pg_repos_check_packages: []

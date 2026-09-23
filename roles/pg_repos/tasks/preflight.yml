@@ -1,0 +1,26 @@
+---
+- name: Probe repodata of enabled repositories
+  ansible.builtin.uri:
+    url: "{{ item.baseurl }}repodata/repomd.xml"
+    method: GET
+    return_content: false
+    timeout: 15
+    status_code: [200]
+  register: pg_repos_probe
+  failed_when: false
+  check_mode: false
+  changed_when: false
+  loop: "{{ pg_repos_list | rejectattr('enabled', 'false') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Fail if a repository is missing in the mirror
+  ansible.builtin.fail:
+    msg: >-
+      Репозиторий {{ item.item.name }} ({{ item.item.baseurl }}) недоступен в зеркале.
+      Запросите добавление у команды зеркала.
+      (HTTP {{ item.status | default('n/a') }}: {{ item.msg | default('') }})
+  when: item.status | default(-1) != 200
+  loop: "{{ pg_repos_probe.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
