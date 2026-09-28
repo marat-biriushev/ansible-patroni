@@ -5,19 +5,21 @@
   when: not ansible_check_mode
   no_log: "{{ secrets_no_log }}"
   block:
-    - name: Check authentication status as root
+    # Без логина: если auth выключен — "Authentication Status: false".
+    # Логин передаётся как ETCDCTL_USER=user:password, чтобы etcdctl не спрашивал пароль.
+    - name: Check authentication status
       ansible.builtin.command:
         cmd: etcdctl auth status
-      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password}) }}"
+      environment: "{{ etcd_ctl_env_base }}"
       register: etcd_auth_status
       changed_when: false
       failed_when: false
 
     - name: Choose etcdctl credentials
       ansible.builtin.set_fact:
-        etcd_auth_enabled: "{{ etcd_auth_status.rc == 0 and 'Status: true' in etcd_auth_status.stdout }}"
-        etcd_ctl_env: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password})
-                          if (etcd_auth_status.rc == 0 and 'Status: true' in etcd_auth_status.stdout) else etcd_ctl_env_base }}"
+        etcd_auth_enabled: "{{ not (etcd_auth_status.rc == 0 and 'Status: false' in etcd_auth_status.stdout) }}"
+        etcd_ctl_env: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user ~ ':' ~ etcd_root_password})
+                          if not (etcd_auth_status.rc == 0 and 'Status: false' in etcd_auth_status.stdout) else etcd_ctl_env_base }}"
 
     - name: List etcd users
       ansible.builtin.command:
@@ -102,7 +104,7 @@
     - name: Verify Patroni credentials
       ansible.builtin.command:
         cmd: etcdctl get {{ etcd_patroni_prefix }} --prefix --keys-only --limit 1
-      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_patroni_user, 'ETCDCTL_PASSWORD': etcd_patroni_password}) }}"
+      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_patroni_user ~ ':' ~ etcd_patroni_password}) }}"
       register: etcd_patroni_login
       changed_when: false
       failed_when: false
@@ -111,6 +113,6 @@
       ansible.builtin.command:
         cmd: etcdctl user passwd {{ etcd_patroni_user }} --interactive=false
         stdin: "{{ etcd_patroni_password }}"
-      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user, 'ETCDCTL_PASSWORD': etcd_root_password}) }}"
+      environment: "{{ etcd_ctl_env_base | combine({'ETCDCTL_USER': etcd_root_user ~ ':' ~ etcd_root_password}) }}"
       when: etcd_patroni_login.rc != 0
       changed_when: true
