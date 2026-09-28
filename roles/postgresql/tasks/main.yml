@@ -36,6 +36,8 @@
     name: postgresql-{{ pg_major_version }}.service
     enabled: false
     masked: true
+  # в --check пакет ещё не установлен, юнита нет
+  ignore_errors: "{{ ansible_check_mode }}"
   tags: [postgresql]
 
 - name: Create data and WAL directories
