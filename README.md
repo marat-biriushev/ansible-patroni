@@ -70,13 +70,13 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 | `postgres18` | `postgre/yum/18/redhat/rhel-N-x86_64/` | postgresql18-* | включён |
 | `postgres-common` | `postgre/yum/common/redhat/rhel-N-x86_64/` | patroni, patroni-etcd, pgbackrest, pgbouncer | выключен |
 
-Сейчас в зеркале есть только `postgres18`. Репозиториев `common` и `extras` нет, поэтому они
-выключены (`enabled: false`). Пути для них взяты по структуре PGDG. Когда команда зеркала их добавит,
-выставьте `enabled: true`; если путь окажется другим — поправьте `baseurl`.
+Сейчас в зеркале есть только `postgres18`. Репозитория `common` нет, поэтому он выключен
+(`enabled: false`). Когда команда зеркала его добавит, выставьте `enabled: true`; если путь окажется
+другим — поправьте `baseurl`. etcd в PGDG для RHEL 10 нет — см. «Офлайн-установка».
 Новый репозиторий добавляется одной записью в список.
 
-Пока `common`/`extras` нет, работают только теги `pg_repos` и `postgresql`. Роли etcd, patroni,
-pgbackrest, pgbouncer остановятся на проверке пакета с сообщением, какой репозиторий нужен.
+Пока `common` нет, Patroni ставится из `files/rpms/`, etcd — из `files/etcd/` (см. «Офлайн-установка»).
+Без этих файлов роли остановятся на проверке пакета с сообщением, что нужно.
 
 Защита от установки из недоступного источника:
 
@@ -85,7 +85,7 @@ pgbackrest, pgbouncer остановятся на проверке пакета 
   *«Репозиторий … недоступен в зеркале. Запросите добавление у команды зеркала.»*
 - **Проверка перед установкой пакетов.** Каждая роль смотрит, есть ли пакет в подключённых репозиториях.
   Если пакета нет, запуск падает с ошибкой *«Пакет … не найден в подключённых репозиториях. Нужен репо
-  postgres-common|postgres-extras, …»*. Обходов (pip, get_url, сторонние репо) нет.
+  postgres-common, …»*. Обходов (pip, get_url, сторонние репо) нет.
 
 На RHEL 9 выполняется `dnf module disable postgresql`. На RHEL 10 модулей нет, и шаг пропускается.
 
@@ -191,7 +191,7 @@ ansible-vault encrypt vault.yml
 |---|---|
 | `pg_mirror_base` | `http://mirror.ipotekabank.uz/repos` |
 | `pg_repo_gpgcheck` | `false` |
-| `pg_repos_list` | `postgres18` (вкл.), `postgres-common` (выкл.), `postgres-extras` (выкл.) |
+| `pg_repos_list` | `postgres18` (вкл.), `postgres-common` (выкл.) |
 
 ### PostgreSQL / Patroni (`group_vars/postgres.yml`, `roles/patroni/defaults`)
 
@@ -316,10 +316,10 @@ Patroni раскатывается так:
 # 1. Репозитории и пакеты PostgreSQL — доступно сразу
 ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,postgresql
 
-# 2. После появления postgres-extras (etcd) — включить его в pg_repos_list
+# 2. etcd — архив в files/etcd/
 ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,etcd
 
-# 3. После появления postgres-common (patroni) — включить его в pg_repos_list
+# 3. Patroni — RPM в files/rpms/ или postgres-common в pg_repos_list
 ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,patroni
 
 # 4. VIP и балансировка (AppStream, зеркало не нужно)
