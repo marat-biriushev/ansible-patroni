@@ -1,11 +1,15 @@
 ---
+# Коллекции уже лежат в collections/ansible_collections (контроллер без интернета).
+# Версии выбраны совместимыми с ansible-core >= 2.14 (RHEL 9 и RHEL 10).
+# Этот файл — для обновления копии на машине с интернетом:
+#   ansible-galaxy collection install -r requirements.yml -p collections --force
 collections:
   - name: ansible.posix
-    version: ">=1.5.4"
+    version: "1.5.4"
   - name: community.general
-    version: ">=8.0.0"
+    version: "9.5.2"
   - name: community.postgresql
-    version: ">=3.4.0"
+    version: "3.9.0"
   # Генерация самоподписанного CA и сертификатов на контроллере (pki_mode: selfsigned)
   - name: community.crypto
-    version: ">=2.16.0"
+    version: "2.22.3"

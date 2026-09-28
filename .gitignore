@@ -2,7 +2,8 @@
 inventories/*/group_vars/all/vault.yml
 # Ключи CA и узлов, сгенерированные при pki_mode: selfsigned
 inventories/*/pki/
-# Коллекции, установленные локально через ansible-galaxy -p collections
-collections/
+# Коллекции лежат в collections/ (офлайн-установка), байткод не храним
+__pycache__/
+*.pyc
 *.retry
 .vault_pass*

@@ -38,6 +38,7 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 
 ```
 ├── ansible.cfg  requirements.yml  .ansible-lint  .yamllint
+├── collections/ansible_collections/    # коллекции для офлайн-работы
 ├── inventories/prod/
 │   ├── hosts.yml                       # группы etcd, postgres, haproxy
 │   ├── group_vars/all/{main,repos,secrets}.yml, vault.yml.example
@@ -91,11 +92,15 @@ pgbackrest, pgbouncer остановятся на проверке пакета 
 
 ## Подготовка контроллера
 
-```bash
-# ansible-core >= 2.15; для pki_mode: selfsigned нужен python3-cryptography на контроллере
-ansible-galaxy collection install -r requirements.yml -p collections
-# без интернета: скачайте tar.gz коллекций заранее и установите из файлов
-```
+Интернет на контроллере не нужен: коллекции уже лежат в `collections/ansible_collections`
+(ansible.posix 1.5.4, community.general 9.5.2, community.postgresql 3.9.0, community.crypto 2.22.3),
+`ansible.cfg` подхватывает их автоматически. Требования:
+
+- ansible-core >= 2.14;
+- для `pki_mode: selfsigned` — модуль `cryptography` в том же Python, что и Ansible:
+  `python -c "import cryptography"` (на RHEL — пакет `python3-cryptography` из BaseOS).
+
+Проверка: `ansible-galaxy collection list -p collections`.
 
 ## Секреты
 
