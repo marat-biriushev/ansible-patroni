@@ -3,6 +3,8 @@
 {% for h in groups['etcd'] %}
 {%   set ns.members = ns.members + [h ~ '=https://' ~ hostvars[h].cluster_node_ip ~ ':' ~ etcd_peer_port] %}
 {% endfor %}
+{# trusted-ca-file на клиентском порту включает проверку клиентских сертификатов,
+   поэтому задаётся только при etcd_client_cert_auth: клиенты входят по логину/паролю #}
 {% set cfg = {
   'name': inventory_hostname,
   'data-dir': etcd_data_dir,
@@ -24,9 +26,8 @@
   'client-transport-security': {
     'cert-file': etcd_pki_dir ~ '/server.crt',
     'key-file': etcd_pki_dir ~ '/server.key',
-    'trusted-ca-file': etcd_pki_dir ~ '/ca.crt',
     'client-cert-auth': etcd_client_cert_auth | bool,
-  },
+  } | combine({'trusted-ca-file': etcd_pki_dir ~ '/ca.crt'} if etcd_client_cert_auth | bool else {}),
   'peer-transport-security': {
     'cert-file': etcd_pki_dir ~ '/server.crt',
     'key-file': etcd_pki_dir ~ '/server.key',
