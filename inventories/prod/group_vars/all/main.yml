@@ -15,7 +15,7 @@ patroni_bootstrap_leader: "{{ groups['postgres'][0] }}"
 cluster_node_ip: "{{ ansible_host }}"
 
 # Виртуальный IP (keepalived) — точка входа приложений
-cluster_vip: 10.10.10.100
+cluster_vip: 172.31.60.56
 cluster_vip_prefix: 24
 
 # Порты
@@ -32,7 +32,7 @@ haproxy_stats_port: 7000
 patroni_restapi_tls: true
 
 # etcd размещён на узлах БД (группы etcd и postgres совпадают)
-etcd_colocated: false
+etcd_colocated: true
 
 # Опциональные компоненты
 pgbouncer_enabled: false
