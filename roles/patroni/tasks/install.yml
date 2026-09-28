@@ -5,11 +5,42 @@
     tasks_from: check_packages
   vars:
     pg_repos_check_packages: "{{ patroni_packages }}"
+  when: patroni_local_rpms | length == 0
 
 - name: Install Patroni packages
   ansible.builtin.dnf:
     name: "{{ patroni_packages }}"
     state: present
+  when: patroni_local_rpms | length == 0
+
+- name: Install Patroni from local RPM files
+  when: patroni_local_rpms | length > 0
+  block:
+    - name: Create directory for local RPMs
+      ansible.builtin.file:
+        path: "{{ patroni_local_rpms_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy local RPMs
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ patroni_local_rpms_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ patroni_local_rpms }}"
+      loop_control:
+        label: "{{ item | basename }}"
+
+    # Файлы скачаны вручную с download.postgresql.org, репо-проверка подписи не применяется
+    - name: Install local RPMs
+      ansible.builtin.dnf:
+        name: "{{ patroni_local_rpms | map('basename') | map('regex_replace', '^', patroni_local_rpms_dir ~ '/') | list }}"
+        disable_gpg_check: true
+        state: present
 
 - name: Create Patroni directories
   ansible.builtin.file:

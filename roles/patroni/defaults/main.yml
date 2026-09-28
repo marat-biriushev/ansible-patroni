@@ -3,6 +3,10 @@ patroni_version: 4.1.5
 patroni_packages:
   - patroni-{{ patroni_version }}
   - patroni-etcd-{{ patroni_version }}
+# RPM-файлы в files/rpms/ (находятся автоматически). Если они есть,
+# Patroni ставится из них (зависимости — из подключённых репозиториев).
+patroni_local_rpms: "{{ lookup('ansible.builtin.fileglob', offline_files_dir ~ '/rpms/*.rpm', wantlist=true) | sort }}"
+patroni_local_rpms_dir: /var/tmp/patroni-rpms
 patroni_bin: /usr/bin/patroni
 patroni_ctl_bin: /usr/bin/patronictl
 patroni_config_dir: /etc/patroni

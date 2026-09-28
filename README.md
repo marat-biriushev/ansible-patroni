@@ -69,7 +69,6 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 |---|---|---|---|
 | `postgres18` | `postgre/yum/18/redhat/rhel-N-x86_64/` | postgresql18-* | включён |
 | `postgres-common` | `postgre/yum/common/redhat/rhel-N-x86_64/` | patroni, patroni-etcd, pgbackrest, pgbouncer | выключен |
-| `postgres-extras` | `postgre/yum/common/pgdg-rhelN-extras/redhat/rhel-N-x86_64/` | etcd | выключен |
 
 Сейчас в зеркале есть только `postgres18`. Репозиториев `common` и `extras` нет, поэтому они
 выключены (`enabled: false`). Пути для них взяты по структуре PGDG. Когда команда зеркала их добавит,
@@ -89,6 +88,20 @@ pgbackrest, pgbouncer остановятся на проверке пакета 
   postgres-common|postgres-extras, …»*. Обходов (pip, get_url, сторонние репо) нет.
 
 На RHEL 9 выполняется `dnf module disable postgresql`. На RHEL 10 модулей нет, и шаг пропускается.
+
+## Офлайн-установка (пакетов нет в зеркале)
+
+Если нужных пакетов нет в зеркале, их можно скачать на машине с интернетом
+и положить в каталог `files/` проекта. Роли находят файлы сами:
+
+| Каталог | Файлы | Роль |
+|---|---|---|
+| `files/rpms/` | `patroni-*.rpm`, `patroni-etcd-*.rpm` и зависимости из PGDG `common` | `patroni` ставит их через `dnf`; остальные зависимости — из BaseOS/AppStream |
+| `files/etcd/` | `etcd-vX.Y.Z-linux-amd64.tar.gz` с GitHub | `etcd` распаковывает `etcd`, `etcdctl`, `etcdutl` в `/usr/bin` |
+
+etcd для RHEL 10 нет ни в PGDG, ни в EPEL, поэтому он ставится только из архива
+(или из пакета `etcd`, если такой появится в подключённом репозитории).
+Когда пакеты появятся в зеркале, удалите файлы из `files/` — роли вернутся к `dnf`.
 
 ## Подготовка контроллера
 

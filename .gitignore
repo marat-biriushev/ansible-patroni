@@ -7,3 +7,7 @@ __pycache__/
 *.pyc
 *.retry
 .vault_pass*
+# Офлайн-пакеты кладутся вручную, в git не храним
+files/rpms/*.rpm
+files/etcd/*.tar.gz
+files/etcd/SHA256SUMS

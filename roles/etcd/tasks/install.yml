@@ -5,11 +5,29 @@
     tasks_from: check_packages
   vars:
     pg_repos_check_packages: "{{ etcd_packages }}"
+  when: etcd_archive | length == 0
 
 - name: Install etcd packages
   ansible.builtin.dnf:
     name: "{{ etcd_packages }}"
     state: present
+  when: etcd_archive | length == 0
+
+- name: Install etcd binaries from {{ etcd_archive | basename }}
+  ansible.builtin.unarchive:
+    src: "{{ etcd_archive }}"
+    dest: /usr/bin
+    extra_opts:
+      - --strip-components=1
+      - --wildcards
+      - "*/etcd"
+      - "*/etcdctl"
+      - "*/etcdutl"
+    owner: root
+    group: root
+    mode: "0755"
+  when: etcd_archive | length > 0
+  notify: Restart etcd
 
 - name: Ensure etcd group
   ansible.builtin.group:

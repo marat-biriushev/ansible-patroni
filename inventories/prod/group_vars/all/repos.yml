@@ -20,7 +20,4 @@ pg_repos_list:
     description: PostgreSQL common Local Repo
     baseurl: "{{ pg_mirror_base }}/postgre/yum/common/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
     enabled: false   # включить после появления в зеркале (patroni, patroni-etcd, pgbackrest, pgbouncer)
-  - name: postgres-extras
-    description: PostgreSQL extras Local Repo
-    baseurl: "{{ pg_mirror_base }}/postgre/yum/common/pgdg-rhel{{ ansible_distribution_major_version }}-extras/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
-    enabled: false   # включить после появления в зеркале (etcd)
+# etcd в PGDG для RHEL 10 нет — ставится из архива files/etcd/ (см. README)

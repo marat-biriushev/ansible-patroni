@@ -47,6 +47,11 @@ firewalld_zone: public
 # SELinux: метки портов и boolean haproxy_connect_any (SELinux не отключается)
 manage_selinux: true
 
+# Офлайн-установка: RPM и архивы, скачанные вручную и положенные в files/
+# проекта (files/rpms/*.rpm, files/etcd/etcd-v*-linux-amd64.tar.gz).
+# Если файлы есть — роли ставят из них, иначе из репозиториев.
+offline_files_dir: "{{ playbook_dir }}/../files"
+
 # Скрывать секреты в выводе (no_log). false — только для отладки.
 secrets_no_log: true
 

@@ -19,7 +19,7 @@ pg_repos_package_hints:
   patroni-etcd: postgres-common
   pgbackrest: postgres-common
   pgbouncer: postgres-common
-  etcd: postgres-extras
+  etcd: "files/etcd/etcd-v*-linux-amd64.tar.gz (в PGDG для RHEL 10 etcd нет)"
 
 # Пакеты для проверки (передаётся из других ролей через include_role)
 pg_repos_check_packages: []

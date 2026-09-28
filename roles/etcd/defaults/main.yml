@@ -1,6 +1,9 @@
 ---
 etcd_packages:
   - etcd
+# Архив официального релиза в files/etcd/ (находится автоматически).
+# Если он есть, etcd/etcdctl/etcdutl ставятся из него в /usr/bin, иначе — пакет etcd.
+etcd_archive: "{{ lookup('ansible.builtin.fileglob', offline_files_dir ~ '/etcd/etcd-v*-linux-amd64.tar.gz', wantlist=true) | community.general.version_sort | last | default('') }}"
 etcd_binary: /usr/bin/etcd
 etcd_user: etcd
 etcd_group: etcd
