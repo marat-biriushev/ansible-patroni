@@ -1,0 +1,30 @@
+---
+# Скопируйте в vault.yml, заполните и зашифруйте:
+#   cp vault.yml.example vault.yml && ansible-vault encrypt vault.yml
+# Файл vault.yml в .gitignore — храните зашифрованную копию по регламенту.
+
+# PostgreSQL (Patroni создаёт роли при bootstrap)
+vault_patroni_superuser_password: "CHANGE_ME"
+vault_patroni_replication_password: "CHANGE_ME"
+vault_patroni_rewind_password: "CHANGE_ME"
+
+# Basic Auth REST API Patroni (небезопасные методы: switchover, restart, config)
+vault_patroni_restapi_password: "CHANGE_ME"
+
+# etcd: root и пользователь Patroni
+vault_etcd_root_password: "CHANGE_ME"
+vault_etcd_patroni_password: "CHANGE_ME"
+
+# keepalived VRRP auth_pass — не более 8 символов (ограничение VRRP PASS)
+vault_keepalived_auth_pass: "CHANGE_ME"
+
+# Страница статистики HAProxy (:7000)
+vault_haproxy_stats_password: "CHANGE_ME"
+
+# PgBouncer (только при pgbouncer_enabled: true) — пароль роли auth_user
+vault_pgbouncer_auth_password: "CHANGE_ME"
+
+# pgBackRest (только при pgbackrest_enabled: true)
+vault_pgbackrest_s3_key: "CHANGE_ME"
+vault_pgbackrest_s3_key_secret: "CHANGE_ME"
+vault_pgbackrest_cipher_pass: "CHANGE_ME"

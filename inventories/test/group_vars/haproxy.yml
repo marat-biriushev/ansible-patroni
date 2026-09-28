@@ -1,0 +1,9 @@
+---
+# Интерфейс, на который вешается VIP (по умолчанию — интерфейс default route)
+keepalived_interface: "{{ ansible_facts.default_ipv4.interface }}"
+keepalived_virtual_router_id: 51
+# Проверка живости haproxy и её влияние на приоритет
+keepalived_check_interval: 2
+keepalived_check_weight: -60
+keepalived_check_fall: 2
+keepalived_check_rise: 2

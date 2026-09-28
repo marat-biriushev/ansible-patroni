@@ -1,0 +1,7 @@
+---
+# Теги Patroni узла: https://patroni.readthedocs.io/en/latest/yaml_configuration.html#tags
+patroni_tags:
+  nofailover: false
+  noloadbalance: false
+  nosync: false
+  # clonefrom: false

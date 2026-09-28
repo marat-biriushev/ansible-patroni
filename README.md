@@ -39,7 +39,7 @@ chrony/NTP, DNS, hostname, `/etc/hosts`, SSSD/LDAP, SSH, базовый hardenin
 ```
 ├── ansible.cfg  requirements.yml  .ansible-lint  .yamllint
 ├── collections/ansible_collections/    # коллекции для офлайн-работы
-├── inventories/prod/
+├── inventories/{test,prod}/            # окружения; выбираются через -i
 │   ├── hosts.yml                       # группы etcd, postgres, haproxy
 │   ├── group_vars/all/{main,repos,secrets}.yml, vault.yml.example
 │   ├── group_vars/{etcd,postgres,haproxy}.yml
@@ -105,7 +105,7 @@ pgbackrest, pgbouncer остановятся на проверке пакета 
 ## Секреты
 
 ```bash
-cd inventories/prod/group_vars/all
+cd inventories/test/group_vars/all   # или prod
 cp vault.yml.example vault.yml     # заполнить
 ansible-vault encrypt vault.yml
 ```
@@ -263,12 +263,21 @@ pg_hba строится автоматически. В него входят:
 - группы соответствуют `etcd_colocated`;
 - `patroni_bootstrap_leader` входит в группу `postgres`.
 
+## Окружения
+
+`inventories/test` и `inventories/prod` полностью независимы: у каждого свои хосты, VIP, `vault.yml`
+и свой CA (`inventories/<env>/pki/`). Инвентори по умолчанию не задан — всегда указывайте `-i`:
+
+```bash
+ansible-playbook -i inventories/test playbooks/preflight.yml --ask-vault-pass
+```
+
 ## Порядок запуска
 
 Полное развёртывание:
 
 ```bash
-ansible-playbook playbooks/site.yml --ask-vault-pass
+ansible-playbook -i inventories/test playbooks/site.yml --ask-vault-pass
 ```
 
 Порядок внутри `site.yml`:
@@ -292,20 +301,20 @@ Patroni раскатывается так:
 
 ```bash
 # 1. Репозитории и пакеты PostgreSQL — доступно сразу
-ansible-playbook playbooks/site.yml --tags pg_repos,postgresql
+ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,postgresql
 
 # 2. После появления postgres-extras (etcd) — включить его в pg_repos_list
-ansible-playbook playbooks/site.yml --tags pg_repos,etcd
+ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,etcd
 
 # 3. После появления postgres-common (patroni) — включить его в pg_repos_list
-ansible-playbook playbooks/site.yml --tags pg_repos,patroni
+ansible-playbook -i inventories/test playbooks/site.yml --tags pg_repos,patroni
 
 # 4. VIP и балансировка (AppStream, зеркало не нужно)
-ansible-playbook playbooks/haproxy.yml
+ansible-playbook -i inventories/test playbooks/haproxy.yml
 
 # 5. Опционально (pgbackrest_enabled / pgbouncer_enabled: true)
-ansible-playbook playbooks/site.yml --tags pgbouncer
-ansible-playbook playbooks/pgbackrest.yml
+ansible-playbook -i inventories/test playbooks/site.yml --tags pgbouncer
+ansible-playbook -i inventories/test playbooks/pgbackrest.yml
 ```
 
 | Тег | Что делает |
@@ -338,9 +347,9 @@ ansible-playbook playbooks/pgbackrest.yml
 2. Примените их:
 
    ```bash
-   ansible-playbook playbooks/patroni.yml --tags dcs_config
+   ansible-playbook -i inventories/test playbooks/patroni.yml --tags dcs_config
    # с перезапуском узлов, где изменились параметры, требующие рестарта:
-   ansible-playbook playbooks/patroni.yml --tags dcs_config -e patroni_dcs_restart_pending=true
+   ansible-playbook -i inventories/test playbooks/patroni.yml --tags dcs_config -e patroni_dcs_restart_pending=true
    ```
 
 Playbook сравнивает `patronictl show-config` с желаемой конфигурацией. Если есть разница,
@@ -429,6 +438,6 @@ HAProxy переключит трафик на порту 5000 сам (`on-marke
 
 ```bash
 ansible-lint                       # profile: production
-ansible-playbook playbooks/site.yml --syntax-check
-ansible-playbook playbooks/site.yml --check --diff
+ansible-playbook -i inventories/test playbooks/site.yml --syntax-check
+ansible-playbook -i inventories/test playbooks/site.yml --check --diff
 ```

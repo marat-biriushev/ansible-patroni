@@ -1,0 +1,22 @@
+---
+# Внутреннее зеркало (структура download.postgresql.org/pub/repos/yum/)
+pg_mirror_base: http://mirror.ipotekabank.uz/repos
+pg_repo_gpgcheck: false
+
+# Все репозитории пишутся в /etc/yum.repos.d/postgres-local.repo.
+# Новый репозиторий добавляется одной записью. baseurl любого репо можно
+# переопределить здесь, если путь в зеркале отличается от структуры PGDG.
+# Необязательные ключи записи: gpgkey, gpgcheck (иначе pg_repo_gpgcheck).
+pg_repos_list:
+  - name: postgres18
+    description: PostgreSQL 18 Local Repo
+    baseurl: "{{ pg_mirror_base }}/postgre/yum/{{ pg_major_version }}/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
+    enabled: true
+  - name: postgres-common
+    description: PostgreSQL common Local Repo
+    baseurl: "{{ pg_mirror_base }}/postgre/yum/common/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
+    enabled: false   # включить после появления в зеркале (patroni, patroni-etcd, pgbackrest, pgbouncer)
+  - name: postgres-extras
+    description: PostgreSQL extras Local Repo
+    baseurl: "{{ pg_mirror_base }}/postgre/yum/common/pgdg-rhel{{ ansible_distribution_major_version }}-extras/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}/"
+    enabled: false   # включить после появления в зеркале (etcd)
