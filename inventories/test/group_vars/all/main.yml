@@ -41,7 +41,7 @@ pgbackrest_enabled: false
 pgbackrest_stanza: "{{ patroni_scope }}"
 
 # firewalld: открыть порты кластера (по умолчанию не трогаем)
-manage_firewalld: false
+manage_firewalld: true
 firewalld_zone: public
 
 # SELinux: метки портов и boolean haproxy_connect_any (SELinux не отключается)
