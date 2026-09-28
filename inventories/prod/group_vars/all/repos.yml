@@ -2,11 +2,15 @@
 # Внутреннее зеркало (структура download.postgresql.org/pub/repos/yum/)
 pg_mirror_base: http://mirror.ipotekabank.uz/repos
 pg_repo_gpgcheck: false
+# Приоритет репозиториев зеркала (1 — наивысший, у остальных репо по умолчанию 99).
+# В RHEL 10 AppStream есть свои postgresql18*; с приоритетом dnf берёт пакеты
+# с одинаковым именем только из зеркала PGDG.
+pg_repo_priority: 1
 
 # Все репозитории пишутся в /etc/yum.repos.d/postgres-local.repo.
 # Новый репозиторий добавляется одной записью. baseurl любого репо можно
 # переопределить здесь, если путь в зеркале отличается от структуры PGDG.
-# Необязательные ключи записи: gpgkey, gpgcheck (иначе pg_repo_gpgcheck).
+# Необязательные ключи записи: gpgkey, gpgcheck, priority (иначе pg_repo_gpgcheck / pg_repo_priority).
 pg_repos_list:
   - name: postgres18
     description: PostgreSQL 18 Local Repo

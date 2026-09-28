@@ -13,6 +13,23 @@
     state: present
   tags: [postgresql]
 
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: rpm
+  tags: [postgresql]
+
+# Защита от сборки Red Hat из AppStream (другая раскладка, нет /usr/pgsql-18/bin)
+- name: Assert PostgreSQL packages come from PGDG
+  ansible.builtin.assert:
+    that: "'PGDG' in ansible_facts.packages[item][0].release"
+    fail_msg: >-
+      {{ item }}-{{ ansible_facts.packages[item][0].version }}-{{ ansible_facts.packages[item][0].release }}
+      установлен не из PGDG. Удалите пакет (dnf remove {{ item }}) и проверьте priority репозитория postgres18.
+    quiet: true
+  loop: "{{ postgresql_packages }}"
+  when: item in ansible_facts.packages
+  tags: [postgresql]
+
 # Кластером управляет Patroni: штатный юнит пакета не должен стартовать
 - name: Mask the packaged postgresql unit
   ansible.builtin.systemd_service:

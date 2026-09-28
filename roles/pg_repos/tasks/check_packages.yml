@@ -1,5 +1,7 @@
 ---
-# Проверка, что пакеты есть в подключённых репозиториях, до их установки.
+# Проверка, что пакеты есть в репозиториях зеркала (pg_repos_list), до их установки.
+# Пакет с тем же именем в других репо (например, postgresql18* в AppStream RHEL 10)
+# не считается: ставить разрешено только из зеркала PGDG.
 # Вызывается из ролей: include_role name=pg_repos tasks_from=check_packages
 - name: Look up packages in enabled repositories
   ansible.builtin.dnf:
@@ -8,13 +10,18 @@
   check_mode: false
   loop: "{{ pg_repos_check_packages }}"
 
-- name: Fail if a package is not available
+- name: Fail if a package is not available from the mirror
   ansible.builtin.fail:
     msg: >-
-      Пакет {{ item.item }} не найден в подключённых репозиториях.
+      Пакет {{ item.item }} не найден в подключённых репозиториях зеркала
+      ({{ pg_repos_list | rejectattr('enabled', 'false') | map(attribute='name') | join(', ') }}){{
+      '; есть только в: ' ~ (item.results | map(attribute='repo') | unique | join(', ')) if item.results | default([]) | length > 0 else '' }}.
       Нужен репо {{ pg_repos_package_hints[item.item | regex_replace('-[0-9].*$', '')] | default('postgres-common|postgres-extras') }},
       запросите добавление у команды зеркала и включите его в pg_repos_list.
-  when: item.results | default([]) | length == 0
+  when: >-
+    (item.results | default([]) | selectattr('repo', 'in', pg_repos_list | map(attribute='name') | list) | list
+     + item.results | default([]) | selectattr('yumstate', 'equalto', 'installed') | selectattr('release', 'search', 'PGDG') | list)
+    | length == 0
   loop: "{{ pg_repos_pkg_lookup.results }}"
   loop_control:
     label: "{{ item.item }}"

@@ -8,6 +8,7 @@
     enabled: "{{ item.enabled | default(true) | bool }}"
     gpgcheck: "{{ item.gpgcheck | default(pg_repo_gpgcheck) | bool }}"
     gpgkey: "{{ item.gpgkey | default(omit) }}"
+    priority: "{{ item.priority | default(pg_repo_priority) }}"
     state: present
   loop: "{{ pg_repos_list }}"
   loop_control:
