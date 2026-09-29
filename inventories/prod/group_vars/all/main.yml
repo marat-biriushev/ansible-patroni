@@ -63,4 +63,5 @@ secrets_no_log: true
 #                ca.crt, <host>-etcd.{crt,key}, <host>-patroni.{crt,key}
 # ---------------------------------------------------------------------------
 pki_mode: selfsigned
+pki_dns_domain: ipa.ipotekabank.uz
 pki_local_dir: "{{ inventory_dir }}/pki"

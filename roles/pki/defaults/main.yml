@@ -4,9 +4,14 @@
 pki_service: ""
 pki_hosts: []
 pki_extra_sans: []
+# Домен для FQDN узлов в SAN (<host>.<domain>); пусто — без FQDN
+pki_dns_domain: ""
 
-pki_ca_common_name: "{{ patroni_scope }} CA"
+# Совпадает с ручной сборкой (openssl): CN <scope>-ca, CA RSA 4096, узлы RSA 2048.
+# Существующий CA роль никогда не перевыпускает (см. tasks/selfsigned.yml).
+pki_ca_common_name: "{{ patroni_scope }}-ca"
 pki_ca_valid_days: 3650
 pki_cert_valid_days: 825
 pki_key_type: RSA
-pki_key_size: 3072
+pki_ca_key_size: 4096
+pki_key_size: 2048

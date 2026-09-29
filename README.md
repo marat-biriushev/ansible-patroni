@@ -368,16 +368,41 @@ ansible-playbook -i inventories/test playbooks/pgbackrest.yml
 Playbook сравнивает `patronictl show-config` с желаемой конфигурацией. Если есть разница,
 он применяет её через `patronictl edit-config --apply - --force`.
 
+## Запуск поверх кластера, собранного вручную
+
+Роли повторяют ручную сборку из [patroni the hard way](https://github.com/marat-biriushev/patroni)
+(те же пути, юниты, `patroni.yml`, pg_hba, etcd с TLS и RBAC). Чтобы Ansible подхватил
+работающий кластер, а не собрал новый:
+
+1. **Тот же CA.** Положите в `inventories/<env>/pki/` файлы из `/root/pki` на psql01:
+   `ca.crt`, `ca.key`, и для каждого узла сертификат/ключ под двумя именами:
+   ```bash
+   for h in int-res-test-psql01 int-res-test-psql02 int-res-test-psql03; do
+     for svc in etcd patroni; do cp $h.crt $h-$svc.crt; cp $h.key $h-$svc.key; done
+   done
+   ```
+   Существующий `ca.crt` роль `pki` никогда не перевыпускает; сертификаты узлов может
+   перевыпустить тем же CA (если отличаются расширения) — это безопасно.
+2. **Те же значения**: `patroni_scope`, `patroni_namespace`, пароли в `vault.yml` —
+   как в `/root/cluster.env`.
+3. **Сначала `--check --diff`** по одной роли (`--tags etcd`, затем `--tags patroni`).
+   Изменения юнитов приводят к поочерёдному рестарту: etcd — по одному узлу,
+   Patroni — со switchover перед рестартом лидера.
+
+Отличия от ручной сборки: бинарники etcd ставятся в `/usr/bin` (вручную — `/usr/local/bin`,
+его можно удалить после перехода).
+
 ## Проверка
 
 ```bash
 # Patroni: роли узлов, sync standby, lag
 sudo -iu postgres patronictl list          # на любом узле postgres (PATRONICTL_CONFIG_FILE задан)
 
-# etcd: здоровье и члены кластера
+# etcd: здоровье и члены кластера (после auth enable — только с логином)
 source /etc/profile.d/etcdctl.sh
-etcdctl endpoint health
-etcdctl --user root member list -w table   # спросит пароль root
+etcdctl --user "root:<пароль root etcd>" endpoint health
+etcdctl --user "root:<пароль root etcd>" endpoint status -w table
+etcdctl --user "root:<пароль root etcd>" member list -w table
 
 # VIP: должен быть только на MASTER
 ip -brief a show | grep 10.10.10.100       # на haproxy01 / haproxy02

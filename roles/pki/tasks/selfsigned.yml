@@ -18,11 +18,22 @@
   run_once: true
   become: false
 
+# Существующий CA не трогаем никогда: новый CA сломал бы доверие между узлами,
+# которые ещё работают со старыми сертификатами (в т.ч. CA из ручной сборки).
+- name: Stat existing CA certificate
+  ansible.builtin.stat:
+    path: "{{ pki_local_dir }}/ca.crt"
+  register: pki_ca_crt_stat
+  delegate_to: localhost
+  run_once: true
+  become: false
+
 - name: Generate CA private key
   community.crypto.openssl_privatekey:
     path: "{{ pki_local_dir }}/ca.key"
     type: "{{ pki_key_type }}"
-    size: "{{ pki_key_size }}"
+    size: "{{ pki_ca_key_size }}"
+    regenerate: never
     mode: "0600"
   delegate_to: localhost
   run_once: true
@@ -40,7 +51,9 @@
   register: pki_ca_csr
   changed_when: false
   check_mode: false
-  when: not ansible_check_mode or pki_key_stat.results[0].stat.exists
+  when:
+    - not pki_ca_crt_stat.stat.exists
+    - not ansible_check_mode or pki_key_stat.results[0].stat.exists
   delegate_to: localhost
   run_once: true
   become: false
@@ -74,6 +87,7 @@
     privatekey_path: "{{ pki_local_dir }}/{{ item }}-{{ pki_service }}.key"
     common_name: "{{ item }}"
     subject_alt_name: "{{ (['DNS:' ~ item, 'DNS:localhost', 'IP:127.0.0.1', 'IP:' ~ hostvars[item].cluster_node_ip]
+                          + (['DNS:' ~ item ~ '.' ~ pki_dns_domain] if pki_dns_domain | length > 0 else [])
                           + hostvars[item].pki_host_dns_names | default([]) | map('regex_replace', '^', 'DNS:') | list
                           + pki_extra_sans) | unique }}"
     key_usage: [digitalSignature, keyEncipherment]
@@ -98,7 +112,7 @@
     ownca_privatekey_path: "{{ pki_local_dir }}/ca.key"
     ownca_not_after: "+{{ pki_cert_valid_days }}d"
     mode: "0644"
-  when: item.csr is defined and pki_ca_csr.csr is defined
+  when: item.csr is defined and (pki_ca_crt_stat.stat.exists or pki_ca_csr.csr is defined)
   loop: "{{ pki_host_csr.results }}"
   loop_control:
     label: "{{ item.item }}-{{ pki_service }}"

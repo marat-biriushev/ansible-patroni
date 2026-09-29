@@ -14,11 +14,11 @@
   notify: Wait for etcd health
 
 - name: Wait for etcd health
-  ansible.builtin.command:
-    cmd: etcdctl endpoint health
-  environment: "{{ etcd_ctl_env_base }}"
+  ansible.builtin.uri:
+    url: "https://{{ etcd_listen_ip }}:{{ etcd_client_port }}/health"
+    ca_path: "{{ etcd_pki_dir }}/ca.crt"
+    status_code: [200]
   register: etcd_health_after_restart
-  until: etcd_health_after_restart.rc == 0
+  until: etcd_health_after_restart.status == 200
   retries: "{{ etcd_wait_retries }}"
   delay: "{{ etcd_wait_delay }}"
-  changed_when: false

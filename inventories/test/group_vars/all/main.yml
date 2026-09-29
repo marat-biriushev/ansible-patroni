@@ -5,7 +5,7 @@
 pg_major_version: 18
 
 # Имя кластера Patroni и префикс ключей в etcd
-patroni_scope: pg18-ipoteka-cluster
+patroni_scope: integration-test-cluster
 patroni_namespace: /db/
 
 # Узел, который инициализирует кластер при первом развёртывании (bootstrap)
@@ -63,4 +63,5 @@ secrets_no_log: true
 #                ca.crt, <host>-etcd.{crt,key}, <host>-patroni.{crt,key}
 # ---------------------------------------------------------------------------
 pki_mode: selfsigned
+pki_dns_domain: ipa.ipotekabank.uz
 pki_local_dir: "{{ inventory_dir }}/pki"

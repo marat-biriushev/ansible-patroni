@@ -43,6 +43,13 @@
       when: etcd_root_user not in etcd_users.stdout_lines
       changed_when: true
 
+    - name: Create root role
+      ansible.builtin.command:
+        cmd: etcdctl role add root
+      environment: "{{ etcd_ctl_env }}"
+      when: "'root' not in etcd_roles.stdout_lines"
+      changed_when: true
+
     - name: Grant root role to root user
       ansible.builtin.command:
         cmd: etcdctl user grant-role {{ etcd_root_user }} root

@@ -2,7 +2,6 @@
 - name: Common facts for etcdctl
   ansible.builtin.set_fact:
     etcd_ctl_env_base:
-      ETCDCTL_API: "3"
       ETCDCTL_ENDPOINTS: "https://{{ etcd_listen_ip }}:{{ etcd_client_port }}"
       ETCDCTL_CACERT: "{{ etcd_pki_dir }}/ca.crt"
       ETCDCTL_DIAL_TIMEOUT: 5s

@@ -16,13 +16,14 @@
     state: started
     enabled: true
 
+# HTTP /health на клиентском порту не требует логина — работает и до, и после auth enable
 - name: Wait for local etcd endpoint
-  ansible.builtin.command:
-    cmd: etcdctl endpoint health
-  environment: "{{ etcd_ctl_env_base }}"
+  ansible.builtin.uri:
+    url: "https://{{ etcd_listen_ip }}:{{ etcd_client_port }}/health"
+    ca_path: "{{ etcd_pki_dir }}/ca.crt"
+    status_code: [200]
   register: etcd_health
-  until: etcd_health.rc == 0
+  until: etcd_health.status == 200
   retries: "{{ etcd_wait_retries }}"
   delay: "{{ etcd_wait_delay }}"
-  changed_when: false
   when: not ansible_check_mode
