@@ -25,7 +25,7 @@
   ansible.builtin.copy:
     dest: /etc/profile.d/patronictl.sh
     content: |
-      # {{ ansible_managed }}
+      # Ansible managed
       export PATRONICTL_CONFIG_FILE={{ patroni_config_file }}
     owner: root
     group: root
