@@ -5,7 +5,7 @@
 pg_major_version: 18
 
 # Имя кластера Patroni и префикс ключей в etcd
-patroni_scope: pg18-ipoteka-cluster
+patroni_scope: integration-prod-cluster
 patroni_namespace: /db/
 
 # Узел, который инициализирует кластер при первом развёртывании (bootstrap)
@@ -41,7 +41,7 @@ pgbackrest_enabled: false
 pgbackrest_stanza: "{{ patroni_scope }}"
 
 # firewalld: открыть порты кластера (по умолчанию не трогаем)
-manage_firewalld: false
+manage_firewalld: true
 firewalld_zone: public
 
 # SELinux: метки портов и boolean haproxy_connect_any (SELinux не отключается)
